@@ -1,0 +1,819 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-03T05:15:05.535Z",
+  "title": "HQ17B Option 1 runtime HUD visual proof",
+  "source": "FP-E2E-022B1 continuous guarded endpoint replay with HQ17B DOM/CSS HUD slot assertions.",
+  "branch": "neo/progression-atlas-editor-next-2026-05-29",
+  "screenshots": [
+    "reports/agent-town-hq17b-option1-runtime-hud-visual-proof-desktop-2026-06-03.png",
+    "reports/agent-town-hq17b-option1-runtime-hud-visual-proof-mobile-2026-06-03.png"
+  ],
+  "requests": {
+    "firstScout": {
+      "endpointUsed": "et.plot.scout_sector",
+      "revealedCellId": "cell_q1_r0",
+      "packetId": "expedition_event_packet_fb575b4ee640ead4",
+      "boundaryFlags": {
+        "samePlotOnly": true,
+        "serverOwnedDiscoveryReceipt": true,
+        "revealsExactlyOneSector": true,
+        "autonomousMovement": false,
+        "resourceHarvesting": false,
+        "resourceDelta": {},
+        "routeCreation": false,
+        "tradeRouteCreation": false,
+        "backgroundScheduling": false,
+        "combat": false,
+        "publicSharing": false,
+        "generatedUniverseRendering": false,
+        "crossPlotMutation": false,
+        "atlasExecution": false,
+        "externalEffects": false
+      }
+    },
+    "packetPlan": {
+      "endpointUsed": "et.plot.draft_site_plan_from_packet",
+      "planId": "site_plan_expedition_event_packet_fb575b4ee640ead4",
+      "packetId": "expedition_event_packet_fb575b4ee640ead4",
+      "boundaryFlags": {
+        "samePlotOnly": true,
+        "createsSitePlan": true,
+        "createsSurveyor": false,
+        "planningRecordOnly": true,
+        "reviewed": false,
+        "autonomousMovement": false,
+        "operatorAssignment": false,
+        "resourceHarvesting": false,
+        "resourceDelta": {},
+        "resourceGain": false,
+        "resourceLoss": false,
+        "routeCreation": false,
+        "tradeRouteCreation": false,
+        "rewardCreation": false,
+        "backgroundScheduling": false,
+        "combat": false,
+        "publicSharing": false,
+        "generatedUniverseRendering": false,
+        "hiddenTruthLeakage": false,
+        "crossPlotMutation": false,
+        "atlasExecution": false,
+        "externalEffects": false
+      }
+    },
+    "review": {
+      "endpointUsed": "et.plot.review_site_plan",
+      "planId": "site_plan_expedition_event_packet_fb575b4ee640ead4",
+      "reviewStatus": "reviewed"
+    },
+    "prepareConvoy": {
+      "endpointUsed": "et.plot.prepare_settler_convoy",
+      "claimId": "claim_aa74dec9a9cb8d3b",
+      "status": "CONVOY_PREPARING"
+    },
+    "foundOutpost": {
+      "endpointUsed": "et.plot.found_settlement",
+      "claimId": "claim_aa74dec9a9cb8d3b",
+      "foundedPlotId": "plot_255171e272830227"
+    }
+  },
+  "hudProof": {
+    "initial": {
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "documentScrollWidth": 1280,
+      "panel": {
+        "present": true,
+        "visible": true,
+        "rect": {
+          "x": 24,
+          "y": 120,
+          "width": 1232,
+          "height": 788,
+          "right": 1256,
+          "bottom": 908
+        },
+        "testid": "fp-expedition-map-panel",
+        "hudInstrument": "",
+        "actions": 0,
+        "readOnly": "",
+        "text": "Expedition Map Survey R1 H9 Q1 R0 · ◇ + - 0 ◎ ◎ ◆1 □9 LEDGER / FOG ⌾ ⌖ ⌖ 1 ◆ 1 □ 9 ◉ 3 ◎ ⌖ ⌖ Q1 R0 ✦ ⌖ Scout SCT · Q1 R0 ✓ ⌖ Ready ◇ ⚿ ⚿ Map Q1 R0 ➜ ⌖ Scout Q1 R0 · ◇ DETAILS ◆ 1 ● 0 ◇ 1 □ 8 ◇ ◇ ◇ ◇ ⌖ 1 ⚿ 3 ◉ 1 ⚿ MT RS VD ◉ 3 ◉ 1 ✦ ⌖ ⌖ ◆ 1 ⚑ ✉ ◆ 0 ◈ ◉ ◆ 0 ⌖ ⌖ ↦ ⌖ ⌖ ◇ 0 ↦ ↦ ⌘ Selected details DETAILS Marker details PENDING Fog 9 FOG Aliases ALIAS Revealed 1 RECEIPT"
+      },
+      "bodyClasses": [
+        "fp-panel__body",
+        "fp-expedition-map-body",
+        "fp-expedition-map-body--map-first",
+        "fp-expedition-map-body--hq17b-option1"
+      ],
+      "panelClasses": [
+        "fp-parchment",
+        "fp-panel",
+        "fp-expedition-map-panel",
+        "fp-expedition-map-panel--hq17b-option1"
+      ],
+      "board": {
+        "present": true,
+        "visible": true,
+        "rect": {
+          "x": 26,
+          "y": 122,
+          "width": 1228,
+          "height": 784,
+          "right": 1254,
+          "bottom": 906
+        },
+        "testid": "fp-expedition-map-board-card",
+        "hudInstrument": "",
+        "actions": 0,
+        "readOnly": "",
+        "text": "Survey R1 H9 Q1 R0 · ◇ + - 0 ◎ ◎ ◆1 □9 LEDGER / FOG ⌾ ⌖ ⌖ 1 ◆ 1 □ 9 ◉ 3 ◎ ⌖ ⌖ Q1 R0 ✦ ⌖ Scout SCT · Q1 R0 ✓ ⌖ Ready ◇ ⚿ ⚿ Map Q1 R0 ➜ ⌖ Scout Q1 R0 · ◇ DETAILS ◆ 1 ● 0 ◇ 1 □ 8 ◇ ◇ ◇ ◇ ⌖ 1 ⚿ 3 ◉ 1 ⚿ MT RS VD ◉ 3 ◉ 1 ✦ ⌖ ⌖ ◆ 1 ⚑ ✉ ◆ 0 ◈ ◉ ◆ 0 ⌖ ⌖ ↦ ⌖ ⌖ ◇ 0 ↦ ↦",
+        "composition": "hq17b_option1_runtime"
+      },
+      "slots": {
+        "crestStatus": {
+          "present": true,
+          "visible": true,
+          "rect": {
+            "x": 102,
+            "y": 136,
+            "width": 276,
+            "height": 52,
+            "right": 378,
+            "bottom": 188
+          },
+          "testid": "fp-expedition-map-status",
+          "hudInstrument": "crest-status",
+          "actions": 0,
+          "readOnly": "true",
+          "text": "◎ ◎ ◆1 □9 LEDGER / FOG"
+        },
+        "objectiveLoop": {
+          "present": true,
+          "visible": true,
+          "rect": {
+            "x": 40,
+            "y": 202,
+            "width": 548,
+            "height": 102,
+            "right": 588,
+            "bottom": 304
+          },
+          "testid": "fp-expedition-objective-strip",
+          "hudInstrument": "objective-loop",
+          "actions": 0,
+          "readOnly": "true",
+          "text": "⌾ ⌖ ⌖ 1 ◆ 1 □ 9 ◉ 3 ◎ ⌖ ⌖ Q1 R0 ✦ ⌖ Scout SCT · Q1 R0 ✓ ⌖ Ready ◇ ⚿ ⚿ Map Q1 R0 ➜ ⌖ Scout Q1 R0 · ◇ DETAILS"
+        },
+        "unitDock": {
+          "present": true,
+          "visible": true,
+          "rect": {
+            "x": 42,
+            "y": 747,
+            "width": 636,
+            "height": 143,
+            "right": 678,
+            "bottom": 890
+          },
+          "testid": "fp-expedition-unit-roster",
+          "hudInstrument": "unit-dock",
+          "actions": 1,
+          "readOnly": "true",
+          "text": "◉ 3 ◉ 1 ✦ ⌖ ⌖ ◆ 1 ⚑ ✉ ◆ 0 ◈ ◉ ◆ 0 ⌖ ⌖ ↦ ⌖ ⌖ ◇ 0 ↦ ↦"
+        },
+        "commandPuck": {
+          "present": true,
+          "visible": true,
+          "rect": {
+            "x": 258,
+            "y": 690,
+            "width": 205,
+            "height": 48,
+            "right": 462,
+            "bottom": 738
+          },
+          "testid": "fp-expedition-unit-command-bar",
+          "hudInstrument": "command-puck",
+          "actions": 1,
+          "readOnly": "true",
+          "text": "⌖ ⌖ ↦ ⌖ ⌖ ◇ 0 ↦ ↦"
+        },
+        "selectedContext": {
+          "present": true,
+          "visible": true,
+          "rect": {
+            "x": 828,
+            "y": 760,
+            "width": 350,
+            "height": 128,
+            "right": 1178,
+            "bottom": 888
+          },
+          "testid": "fp-expedition-map-visual-hud",
+          "hudInstrument": "selected-context",
+          "actions": 0,
+          "readOnly": "",
+          "text": "◆ 1 ● 0 ◇ 1 □ 8 ◇ ◇ ◇ ◇ ⌖ 1 ⚿ 3 ◉ 1 ⚿ MT RS VD"
+        },
+        "selectedSector": {
+          "present": true,
+          "visible": true,
+          "rect": {
+            "x": 828,
+            "y": 802,
+            "width": 350,
+            "height": 86,
+            "right": 1178,
+            "bottom": 888
+          },
+          "testid": "fp-expedition-map-selected-summary",
+          "hudInstrument": "selected-sector",
+          "actions": 0,
+          "readOnly": "",
+          "text": "◇ ◇ ◇ ◇ ⌖ 1 ⚿ 3 ◉ 1 ⚿ MT RS VD"
+        },
+        "siteContext": {
+          "present": false
+        },
+        "outpostContext": {
+          "present": false
+        },
+        "nextScoutCue": {
+          "present": false
+        },
+        "collapsedLedger": {
+          "present": true,
+          "visible": true,
+          "rect": {
+            "x": 1186,
+            "y": 198,
+            "width": 54,
+            "height": 694,
+            "right": 1240,
+            "bottom": 892
+          },
+          "testid": "fp-expedition-map-hud",
+          "hudInstrument": "collapsed-ledger",
+          "actions": 0,
+          "readOnly": "true",
+          "text": "⌘ Selected details DETAILS Marker details PENDING Fog 9 FOG Aliases ALIAS Revealed 1 RECEIPT"
+        }
+      },
+      "primaryText": "◎\n◎\n◆1\n□9\nLEDGER / FOG\n⌾\n⌖\n⌖\n1\n◆\n1\n□\n9\n◉\n3\n◎\n⌖\n⌖\nQ1 R0\n✦\n⌖\nScout\nSCT · Q1 R0\n✓\n⌖\nReady\n◇\n⚿\n⚿\nMap\nQ1 R0\n➜\n⌖\nScout\nQ1 R0 · ◇\nDETAILS\n◆\n1\n●\n0\n◇\n1\n□\n8\n◇\n◇\n◇\n◇\n⌖\n1 ⚿\n3 ◉\n1 ⚿\nMT\nRS\nVD\n◉\n3 ◉ 1 ✦\n⌖\n⌖\n◆\n1\n⚑\n✉\n◆\n0\n◈\n◉\n◆\n0\n⌖ ⌖\n↦\n⌖\n⌖ ◇\n0 ↦\n↦\n⌖ ⌖\n↦\n⌖\n⌖ ◇\n0 ↦\n↦",
+      "endpointNamesInPrimaryText": false,
+      "proofWordsInPrimaryText": false,
+      "openDetails": [],
+      "clipped": [],
+      "hudInstrumentCount": 8
+    },
+    "desktop": {
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "documentScrollWidth": 1280,
+      "panel": {
+        "present": true,
+        "visible": true,
+        "rect": {
+          "x": 24,
+          "y": 114,
+          "width": 1232,
+          "height": 788,
+          "right": 1256,
+          "bottom": 902
+        },
+        "testid": "fp-expedition-map-panel",
+        "hudInstrument": "",
+        "actions": 0,
+        "readOnly": "",
+        "text": "Expedition Map Survey R2 H10 Q1 R0 · ◆ + - 0 ◎ ◎ ◆2 □10 LEDGER / FOG ⌾ ⌖ ⌖ 2 ◆ 2 □ 10 ◉ 3 ◎ ⌖ ⌖ Q1 R-1 ✦ ⌖ Scout SCT · Q1 R-1 ✓ ⌖ Ready ◇ ⚿ ⚿ Marker Q1 R0 ➜ ⌖ Scout Q1 R-1 · ◇ ⚑ Scout Q1 R0 ▧ Site Ready ✦ Wait Wait DETAILS ◆ 2 ● 0 ◇ 2 □ 8 ⌂ ⌂ ◆ ◆ ○ 6 ⚿ 3 ◉ ⚑ Scout Q1 R0 ▧ Site Ready ✦ Wait Wait 6 ⚿ MT RS VD ◉ 5 ◉ 2 ✦ ⌖ ⌖ ◆ 2 ⚑ ✉ ◆ 0 ◈ ◉ ◆ 0 ⌗ ▧ ◆ 0 ⌂ ⌂ ◆ 0 ⌂ ⌂ ◎ 0 ↦ ⏳ ⌂ Set ● Q1 R0 ◇ Q1 R-1 0 ✦ ⌖ Next Scout Q1 R-1 ⌘ Selected details DETAILS Marker details DETAILS Fog 10 FOG Aliases ALIAS Revealed 2 RECEIPT"
+      },
+      "bodyClasses": [
+        "fp-panel__body",
+        "fp-expedition-map-body",
+        "fp-expedition-map-body--map-first",
+        "fp-expedition-map-body--hq17b-option1"
+      ],
+      "panelClasses": [
+        "fp-parchment",
+        "fp-panel",
+        "fp-expedition-map-panel",
+        "fp-expedition-map-panel--hq17b-option1"
+      ],
+      "board": {
+        "present": true,
+        "visible": true,
+        "rect": {
+          "x": 26,
+          "y": 116,
+          "width": 1228,
+          "height": 784,
+          "right": 1254,
+          "bottom": 900
+        },
+        "testid": "fp-expedition-map-board-card",
+        "hudInstrument": "",
+        "actions": 0,
+        "readOnly": "",
+        "text": "Survey R2 H10 Q1 R0 · ◆ + - 0 ◎ ◎ ◆2 □10 LEDGER / FOG ⌾ ⌖ ⌖ 2 ◆ 2 □ 10 ◉ 3 ◎ ⌖ ⌖ Q1 R-1 ✦ ⌖ Scout SCT · Q1 R-1 ✓ ⌖ Ready ◇ ⚿ ⚿ Marker Q1 R0 ➜ ⌖ Scout Q1 R-1 · ◇ ⚑ Scout Q1 R0 ▧ Site Ready ✦ Wait Wait DETAILS ◆ 2 ● 0 ◇ 2 □ 8 ⌂ ⌂ ◆ ◆ ○ 6 ⚿ 3 ◉ ⚑ Scout Q1 R0 ▧ Site Ready ✦ Wait Wait 6 ⚿ MT RS VD ◉ 5 ◉ 2 ✦ ⌖ ⌖ ◆ 2 ⚑ ✉ ◆ 0 ◈ ◉ ◆ 0 ⌗ ▧ ◆ 0 ⌂ ⌂ ◆ 0 ⌂ ⌂ ◎ 0 ↦ ⏳ ⌂ Set ● Q1 R0 ◇ Q1 R-1 0 ✦ ⌖ Next Scout Q1 R-1",
+        "composition": "hq17b_option1_runtime"
+      },
+      "slots": {
+        "crestStatus": {
+          "present": true,
+          "visible": true,
+          "rect": {
+            "x": 102,
+            "y": 130,
+            "width": 276,
+            "height": 52,
+            "right": 378,
+            "bottom": 182
+          },
+          "testid": "fp-expedition-map-status",
+          "hudInstrument": "crest-status",
+          "actions": 0,
+          "readOnly": "true",
+          "text": "◎ ◎ ◆2 □10 LEDGER / FOG"
+        },
+        "objectiveLoop": {
+          "present": true,
+          "visible": true,
+          "rect": {
+            "x": 40,
+            "y": 196,
+            "width": 548,
+            "height": 152,
+            "right": 588,
+            "bottom": 348
+          },
+          "testid": "fp-expedition-objective-strip",
+          "hudInstrument": "objective-loop",
+          "actions": 0,
+          "readOnly": "true",
+          "text": "⌾ ⌖ ⌖ 2 ◆ 2 □ 10 ◉ 3 ◎ ⌖ ⌖ Q1 R-1 ✦ ⌖ Scout SCT · Q1 R-1 ✓ ⌖ Ready ◇ ⚿ ⚿ Marker Q1 R0 ➜ ⌖ Scout Q1 R-1 · ◇ ⚑ Scout Q1 R0 ▧ Site Ready ✦ Wait Wait DETAILS"
+        },
+        "unitDock": {
+          "present": true,
+          "visible": true,
+          "rect": {
+            "x": 42,
+            "y": 685,
+            "width": 636,
+            "height": 199,
+            "right": 678,
+            "bottom": 884
+          },
+          "testid": "fp-expedition-unit-roster",
+          "hudInstrument": "unit-dock",
+          "actions": 0,
+          "readOnly": "true",
+          "text": "◉ 5 ◉ 2 ✦ ⌖ ⌖ ◆ 2 ⚑ ✉ ◆ 0 ◈ ◉ ◆ 0 ⌗ ▧ ◆ 0 ⌂ ⌂ ◆ 0 ⌂ ⌂ ◎ 0 ↦ ⏳ ⌂ Set ● Q1 R0 ◇ Q1 R-1 0 ✦ ⌖ Next Scout Q1 R-1"
+        },
+        "commandPuck": {
+          "present": true,
+          "visible": true,
+          "rect": {
+            "x": 294,
+            "y": 641,
+            "width": 132,
+            "height": 35,
+            "right": 426,
+            "bottom": 676
+          },
+          "testid": "fp-expedition-unit-command-bar",
+          "hudInstrument": "command-puck",
+          "actions": 0,
+          "readOnly": "true",
+          "text": "⌂ ⌂ ◎ 0 ↦ ⏳"
+        },
+        "selectedContext": {
+          "present": true,
+          "visible": true,
+          "rect": {
+            "x": 828,
+            "y": 704,
+            "width": 350,
+            "height": 178,
+            "right": 1178,
+            "bottom": 882
+          },
+          "testid": "fp-expedition-map-visual-hud",
+          "hudInstrument": "selected-context",
+          "actions": 0,
+          "readOnly": "",
+          "text": "◆ 2 ● 0 ◇ 2 □ 8 ⌂ ⌂ ◆ ◆ ○ 6 ⚿ 3 ◉ ⚑ Scout Q1 R0 ▧ Site Ready ✦ Wait Wait 6 ⚿ MT RS VD"
+        },
+        "selectedSector": {
+          "present": true,
+          "visible": true,
+          "rect": {
+            "x": 828,
+            "y": 746,
+            "width": 350,
+            "height": 136,
+            "right": 1178,
+            "bottom": 882
+          },
+          "testid": "fp-expedition-map-selected-summary",
+          "hudInstrument": "selected-sector",
+          "actions": 0,
+          "readOnly": "",
+          "text": "⌂ ⌂ ◆ ◆ ○ 6 ⚿ 3 ◉ ⚑ Scout Q1 R0 ▧ Site Ready ✦ Wait Wait 6 ⚿ MT RS VD"
+        },
+        "siteContext": {
+          "present": false
+        },
+        "outpostContext": {
+          "present": true,
+          "visible": true,
+          "rect": {
+            "x": 50,
+            "y": 826,
+            "width": 620,
+            "height": 50,
+            "right": 670,
+            "bottom": 876
+          },
+          "testid": "fp-expedition-outpost-status",
+          "hudInstrument": "outpost-context",
+          "actions": 0,
+          "readOnly": "true",
+          "text": "⌂ Set ● Q1 R0 ◇ Q1 R-1 0 ✦ ⌖ Next Scout Q1 R-1"
+        },
+        "nextScoutCue": {
+          "present": true,
+          "visible": true,
+          "rect": {
+            "x": 499,
+            "y": 833,
+            "width": 164,
+            "height": 36,
+            "right": 663,
+            "bottom": 869
+          },
+          "testid": "fp-expedition-outpost-next-scout-cue",
+          "hudInstrument": "next-scout-cue",
+          "actions": 0,
+          "readOnly": "true",
+          "text": "⌖ Next Scout Q1 R-1"
+        },
+        "collapsedLedger": {
+          "present": true,
+          "visible": true,
+          "rect": {
+            "x": 1186,
+            "y": 192,
+            "width": 54,
+            "height": 694,
+            "right": 1240,
+            "bottom": 886
+          },
+          "testid": "fp-expedition-map-hud",
+          "hudInstrument": "collapsed-ledger",
+          "actions": 0,
+          "readOnly": "true",
+          "text": "⌘ Selected details DETAILS Marker details DETAILS Fog 10 FOG Aliases ALIAS Revealed 2 RECEIPT"
+        }
+      },
+      "primaryText": "◎\n◎\n◆2\n□10\nLEDGER / FOG\n⌾\n⌖\n⌖\n2\n◆\n2\n□\n10\n◉\n3\n◎\n⌖\n⌖\nQ1 R-1\n✦\n⌖\nScout\nSCT · Q1 R-1\n✓\n⌖\nReady\n◇\n⚿\n⚿\nMarker\nQ1 R0\n➜\n⌖\nScout\nQ1 R-1 · ◇\n⚑\nScout\nQ1 R0\n▧\nSite\nReady\n✦\nWait\nWait\nDETAILS\n◆\n2\n●\n0\n◇\n2\n□\n8\n⌂\n⌂\n◆\n◆\n○\n6 ⚿\n3 ◉\n⚑\nScout\nQ1 R0\n▧\nSite\nReady\n✦\nWait\nWait\n6 ⚿\nMT\nRS\nVD\n◉\n5 ◉ 2 ✦\n⌖\n⌖\n◆\n2\n⚑\n✉\n◆\n0\n◈\n◉\n◆\n0\n⌗\n▧\n◆\n0\n⌂\n⌂\n◆\n0\n⌂ ⌂\n◎\n0 ↦\n⏳\n⌂ Set\n● Q1 R0\n◇ Q1 R-1\n0 ✦\n⌖\nNext Scout\nQ1 R-1\n⌂ ⌂\n◎\n0 ↦\n⏳\n⌂ Set\n● Q1 R0\n◇ Q1 R-1\n0 ✦\n⌖\nNext Scout\nQ1 R-1\n⌖\nNext Scout\nQ1 R-1",
+      "endpointNamesInPrimaryText": false,
+      "proofWordsInPrimaryText": false,
+      "openDetails": [],
+      "clipped": [],
+      "hudInstrumentCount": 10
+    },
+    "mobile": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "documentScrollWidth": 390,
+      "panel": {
+        "present": true,
+        "visible": true,
+        "rect": {
+          "x": 12,
+          "y": 90,
+          "width": 366,
+          "height": 756,
+          "right": 378,
+          "bottom": 846
+        },
+        "testid": "fp-expedition-map-panel",
+        "hudInstrument": "",
+        "actions": 0,
+        "readOnly": "",
+        "text": "Expedition Map + - 0 ◎ ◎ ◆2 □10 LEDGER / FOG ⌾ ⌖ ⌖ ⌖ ⌖ Scout ⌖ Ready ⚿ Marker ⌖ Scout ⚑ Scout Q1 R0 ▧ Site Ready ✦ Wait Wait DETAILS ◇ ◇ ◇ ◇ ⌖ 1 ⚿ 3 ◉ 1 ⚿ MT RS VD ◉ 5 ◉ 2 ✦ ⌖ ⌖ ◆ 2 ⚑ ✉ ◆ 0 ◈ ◉ ◆ 0 ⌗ ▧ ◆ 0 ⌂ ⌂ ◆ 0 ⌖ ⌖ ↦ ↦ ◆ ⌖ ⌖ ◇ 1 ↦ ↦ ⌘ Selected details DETAILS Marker details PENDING Fog 10 FOG Aliases ALIAS Revealed 2 RECEIPT"
+      },
+      "bodyClasses": [
+        "fp-panel__body",
+        "fp-expedition-map-body",
+        "fp-expedition-map-body--map-first",
+        "fp-expedition-map-body--hq17b-option1"
+      ],
+      "panelClasses": [
+        "fp-parchment",
+        "fp-panel",
+        "fp-expedition-map-panel",
+        "fp-expedition-map-panel--hq17b-option1"
+      ],
+      "board": {
+        "present": true,
+        "visible": true,
+        "rect": {
+          "x": 14,
+          "y": 92,
+          "width": 362,
+          "height": 752,
+          "right": 376,
+          "bottom": 844
+        },
+        "testid": "fp-expedition-map-board-card",
+        "hudInstrument": "",
+        "actions": 0,
+        "readOnly": "",
+        "text": "+ - 0 ◎ ◎ ◆2 □10 LEDGER / FOG ⌾ ⌖ ⌖ ⌖ ⌖ Scout ⌖ Ready ⚿ Marker ⌖ Scout ⚑ Scout Q1 R0 ▧ Site Ready ✦ Wait Wait DETAILS ◇ ◇ ◇ ◇ ⌖ 1 ⚿ 3 ◉ 1 ⚿ MT RS VD ◉ 5 ◉ 2 ✦ ⌖ ⌖ ◆ 2 ⚑ ✉ ◆ 0 ◈ ◉ ◆ 0 ⌗ ▧ ◆ 0 ⌂ ⌂ ◆ 0 ⌖ ⌖ ↦ ↦ ◆ ⌖ ⌖ ◇ 1 ↦ ↦",
+        "composition": "hq17b_option1_runtime"
+      },
+      "slots": {
+        "crestStatus": {
+          "present": true,
+          "visible": true,
+          "rect": {
+            "x": 78,
+            "y": 102,
+            "width": 244,
+            "height": 46,
+            "right": 322,
+            "bottom": 148
+          },
+          "testid": "fp-expedition-map-status",
+          "hudInstrument": "crest-status",
+          "actions": 0,
+          "readOnly": "true",
+          "text": "◎ ◎ ◆2 □10 LEDGER / FOG"
+        },
+        "objectiveLoop": {
+          "present": true,
+          "visible": true,
+          "rect": {
+            "x": 24,
+            "y": 154,
+            "width": 342,
+            "height": 126,
+            "right": 366,
+            "bottom": 280
+          },
+          "testid": "fp-expedition-objective-strip",
+          "hudInstrument": "objective-loop",
+          "actions": 0,
+          "readOnly": "true",
+          "text": "⌾ ⌖ ⌖ ⌖ ⌖ Scout ⌖ Ready ⚿ Marker ⌖ Scout ⚑ Scout Q1 R0 ▧ Site Ready ✦ Wait Wait DETAILS"
+        },
+        "unitDock": {
+          "present": true,
+          "visible": true,
+          "rect": {
+            "x": 24,
+            "y": 608,
+            "width": 342,
+            "height": 124,
+            "right": 366,
+            "bottom": 732
+          },
+          "testid": "fp-expedition-unit-roster",
+          "hudInstrument": "unit-dock",
+          "actions": 2,
+          "readOnly": "true",
+          "text": "◉ 5 ◉ 2 ✦ ⌖ ⌖ ◆ 2 ⚑ ✉ ◆ 0 ◈ ◉ ◆ 0 ⌗ ▧ ◆ 0 ⌂ ⌂ ◆ 0 ⌖ ⌖ ↦ ↦ ◆ ⌖ ⌖ ◇ 1 ↦ ↦"
+        },
+        "commandPuck": {
+          "present": true,
+          "visible": true,
+          "rect": {
+            "x": 110,
+            "y": 532,
+            "width": 170,
+            "height": 69,
+            "right": 280,
+            "bottom": 601
+          },
+          "testid": "fp-expedition-unit-command-bar",
+          "hudInstrument": "command-puck",
+          "actions": 2,
+          "readOnly": "true",
+          "text": "⌖ ⌖ ↦ ↦ ◆ ⌖ ⌖ ◇ 1 ↦ ↦"
+        },
+        "selectedContext": {
+          "present": true,
+          "visible": true,
+          "rect": {
+            "x": 24,
+            "y": 700,
+            "width": 342,
+            "height": 136,
+            "right": 366,
+            "bottom": 836
+          },
+          "testid": "fp-expedition-map-visual-hud",
+          "hudInstrument": "selected-context",
+          "actions": 0,
+          "readOnly": "",
+          "text": "◇ ◇ ◇ ◇ ⌖ 1 ⚿ 3 ◉ 1 ⚿ MT RS VD"
+        },
+        "selectedSector": {
+          "present": true,
+          "visible": true,
+          "rect": {
+            "x": 24,
+            "y": 700,
+            "width": 342,
+            "height": 136,
+            "right": 366,
+            "bottom": 836
+          },
+          "testid": "fp-expedition-map-selected-summary",
+          "hudInstrument": "selected-sector",
+          "actions": 0,
+          "readOnly": "",
+          "text": "◇ ◇ ◇ ◇ ⌖ 1 ⚿ 3 ◉ 1 ⚿ MT RS VD"
+        },
+        "siteContext": {
+          "present": false
+        },
+        "outpostContext": {
+          "present": false
+        },
+        "nextScoutCue": {
+          "present": false
+        },
+        "collapsedLedger": {
+          "present": true,
+          "visible": true,
+          "rect": {
+            "x": 324,
+            "y": 196,
+            "width": 42,
+            "height": 120,
+            "right": 366,
+            "bottom": 316
+          },
+          "testid": "fp-expedition-map-hud",
+          "hudInstrument": "collapsed-ledger",
+          "actions": 0,
+          "readOnly": "true",
+          "text": "⌘ Selected details DETAILS Marker details PENDING Fog 10 FOG Aliases ALIAS Revealed 2 RECEIPT"
+        }
+      },
+      "primaryText": "◎\n◎\n◆2\n□10\nLEDGER / FOG\n⌾\n⌖\n⌖\n⌖\n⌖\nScout\n⌖\nReady\n⚿\nMarker\n⌖\nScout\n⚑\nScout\nQ1 R0\n▧\nSite\nReady\n✦\nWait\nWait\nDETAILS\n◇\n◇\n◇\n◇\n⌖\n1 ⚿\n3 ◉\n1 ⚿\nMT\nRS\nVD\n◉\n5 ◉ 2 ✦\n⌖\n⌖\n◆\n2\n⚑\n✉\n◆\n0\n◈\n◉\n◆\n0\n⌗\n▧\n◆\n0\n⌂\n⌂\n◆\n0\n⌖ ⌖\n↦\n↦ ◆\n⌖\n⌖ ◇\n1 ↦\n↦\n⌖ ⌖\n↦\n↦ ◆\n⌖\n⌖ ◇\n1 ↦\n↦",
+      "endpointNamesInPrimaryText": false,
+      "proofWordsInPrimaryText": false,
+      "openDetails": [],
+      "clipped": [],
+      "hudInstrumentCount": 8
+    }
+  },
+  "rendererProof": {
+    "visualLayers": {
+      "terrainTexture": true,
+      "runtimeRegionAssetPack": "hq14s_public_terrain_underlay_v1",
+      "runtimeRegionAtlas": "/experiences/founders-plot/assets/expedition-map/hq14s-public-terrain-underlay-v1/manifest.json",
+      "runtimeTerrainUnderlay": "/experiences/founders-plot/assets/expedition-map/hq14s-public-terrain-underlay-v1/public-terrain-underlay-candidate-01-v1.png",
+      "runtimeSpriteAssetPack": "hq15e_expedition_unit_marker_sprites_v1",
+      "runtimeSpriteAtlas": "/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/manifest.json",
+      "generatedSpriteAssets": true,
+      "generatedSpriteAssetCount": 8,
+      "generatedSpriteAssetsReady": 8,
+      "generatedSpriteAssetsVisualOnly": true,
+      "generatedSpriteAssetsReadOnly": true,
+      "serverTerrainAssetContractVersion": "agenttown_public_terrain_asset_slots_v1",
+      "serverTerrainSlotSource": "server_read_model_v1",
+      "assetBackedRegionTiles": 12,
+      "assetBackedLoadedTiles": 12,
+      "assetBackedTerrainTextures": true,
+      "continuousTerrainUnderlay": true,
+      "continuousTerrainUnderlayVersion": "hq14t_server_bound_terrain_underlay_v1",
+      "continuousUnderlayUsesServerOwnedCells": true,
+      "continuousUnderlayHiddenCellsFogOnly": true,
+      "continuousUnderlayVisualOnly": true,
+      "plateBlendLayer": true,
+      "softRegionSeams": true,
+      "reducedPlateEdgeContrast": true,
+      "centerTileMutedForUnderlay": true,
+      "cartographicFogDepth": true,
+      "ambientContourField": true,
+      "fogDepthGlyphsVisualOnly": true,
+      "terrainUnderlayCount": 1,
+      "proceduralFallbackWhenAssetPending": true,
+      "candidate02Cues": true,
+      "agentTownIdentityCues": true,
+      "scoutLedgerHud": true,
+      "mapFirstHudOverlays": true,
+      "hoverAffordance": true,
+      "selectedSectorOutline": true,
+      "beaconPlanWagonCues": true,
+      "homeNodeEmphasis": true,
+      "riverFlatCues": true,
+      "waterCuesServerGated": true,
+      "woodlandRidgeCues": true,
+      "ruinSignalCues": true,
+      "ruinSignalCuesServerGated": true,
+      "lockedUnknownSealedFogOnly": true,
+      "hintedAbstractFogEdge": true,
+      "frontierBoundaryDashes": true,
+      "frontierBoundaryVisualOnly": true,
+      "fogVeils": 10,
+      "edgeFogCount": 4,
+      "civicBeaconCount": 2,
+      "surveyStrokeCount": 5,
+      "surveyStrokesVisualOnly": true,
+      "receiptTraceVisualOnly": true,
+      "markerCount": 12,
+      "eventPacketMarkers": true,
+      "eventPacketMarkerCount": 1,
+      "objectiveMarkers": true,
+      "objectiveMarkerCount": 1,
+      "eventObjectiveMarkersVisualOnly": true,
+      "eventObjectiveMarkersReadOnly": true,
+      "eventObjectiveMarkersInspectable": true,
+      "eventObjectiveMarkerAuthority": false,
+      "outpostNextFrontierBeacon": true,
+      "outpostNextFrontierBeaconCount": 1,
+      "outpostNextFrontierBeaconVisualOnly": true,
+      "outpostNextFrontierBeaconReadOnly": true,
+      "outpostNextFrontierBeaconSelectable": false,
+      "outpostNextFrontierBeaconAuthority": false,
+      "outpostNextFrontierBeaconHiddenTruthLeakage": false,
+      "unitTokens": true,
+      "unitTokenCount": 5,
+      "unitTokensReadOnly": true,
+      "unitMovementMutationImplemented": true,
+      "commandTargetRings": true,
+      "commandTargetCount": 0,
+      "commandTargetRingsVisualOnly": true,
+      "commandTargetRingsReadOnly": true,
+      "commandTargetRingsSelectable": true,
+      "commandTargetRingsPreviewOnly": true,
+      "commandTargetRingAuthority": false,
+      "commandOutcomeFeedback": false,
+      "commandOutcomeFeedbackCount": 0,
+      "commandOutcomeFeedbackVisualOnly": true,
+      "commandOutcomeFeedbackReadOnly": true,
+      "commandOutcomeFeedbackServerOwned": true,
+      "commandOutcomeFeedbackSelectable": false,
+      "commandOutcomeFeedbackAuthority": false,
+      "clientAuthority": false
+    },
+    "commandTargets": [],
+    "outpostNextFrontierBeacons": [
+      {
+        "unitId": "expedition_unit_outpost_crew_claim_aa74dec9a9cb8d3b",
+        "unitType": "outpost_crew",
+        "commandId": "scout_sector",
+        "cueLabel": "Next Scout",
+        "originCellId": "cell_q1_r0",
+        "targetCellId": "cell_q2_r-1",
+        "targetFogState": "hinted",
+        "targetKind": "frontier_hint",
+        "derivedFrom": "sourceIds.adjacentCellId",
+        "visualOnly": true,
+        "readOnly": true,
+        "selectable": false,
+        "routeAuthority": false,
+        "actionAuthority": false,
+        "executableActions": 0,
+        "hiddenTruthLeakage": false,
+        "canvas": {
+          "x": 697.9945280437756,
+          "y": 292.9774509803922
+        }
+      }
+    ]
+  },
+  "guardrails": {
+    "optionOneRuntimeClassPresent": true,
+    "optionOnePanelClassPresent": true,
+    "mapFirstHudComposition": true,
+    "requiredHudSlotsVisible": true,
+    "primaryHudNoEndpointNames": true,
+    "primaryHudNoProofProse": true,
+    "desktopMapFirstBoard": true,
+    "ledgerCollapsedByDefault": true,
+    "mobileHorizontalOverflow": true,
+    "mobilePrimaryClipping": true,
+    "commandTargetRingsPreviewOnly": true,
+    "outpostNextScoutVisualOnly": true,
+    "scoutSectorOnlyFogRevealPath": true,
+    "existingGuardedEndpointsOnly": true,
+    "noServerRouteToolSchemaAuthorityChange": true,
+    "noRuntimeAssetPromotion": true,
+    "noAtlasExecution": true,
+    "noGeneratedUniverseRuntimeExpansion": true,
+    "noHiddenTruthLeakage": true,
+    "noRouteTradeEconomyResourceRewardCombatScheduler": true,
+    "noPushMergeDeployPublicShareExternalMessage": true
+  }
+}

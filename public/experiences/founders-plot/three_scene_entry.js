@@ -3642,6 +3642,8 @@ function expeditionOutpostFrontierBeaconForUnit(unit = {}, cellsById = new Map()
   return {
     unitId: String(unit.unitId || ''),
     unitType: String(unit.unitType || ''),
+    commandId: 'scout_sector',
+    cueLabel: 'Next Scout',
     originCellId,
     targetCellId: String(target.cellId || ''),
     targetFogState: String(target.fogState || ''),
@@ -3692,6 +3694,11 @@ function makeExpeditionOutpostNextFrontierTexture(selected = false) {
   ctx.strokeStyle = 'rgba(46, 27, 14, 0.42)';
   ctx.lineWidth = 4;
   ctx.stroke();
+  ctx.fillStyle = selected ? 'rgba(46, 27, 14, 0.72)' : 'rgba(46, 27, 14, 0.58)';
+  ctx.font = '900 20px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('NEXT', 128, 214);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.minFilter = THREE.LinearFilter;
@@ -4721,6 +4728,8 @@ class ExpeditionMapThreeStage {
       outpostNextFrontierBeacons: this.outpostFrontierBeaconSprites.map((sprite) => ({
         unitId: String(sprite.userData?.unitId || ''),
         unitType: String(sprite.userData?.unitType || ''),
+        commandId: String(sprite.userData?.commandId || ''),
+        cueLabel: String(sprite.userData?.cueLabel || ''),
         originCellId: String(sprite.userData?.originCellId || ''),
         targetCellId: String(sprite.userData?.targetCellId || ''),
         targetFogState: String(sprite.userData?.targetFogState || ''),

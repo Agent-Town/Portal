@@ -1749,6 +1749,55 @@ html, body {
   white-space: nowrap;
 }
 
+.fp-expedition-outpost-status__next-cue {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  padding: 5px 7px;
+  border: 1px solid rgba(209, 154, 72, 0.38);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(245, 212, 132, 0.28), rgba(223, 245, 241, 0.44)),
+    rgba(255, 248, 232, 0.84);
+}
+
+.fp-expedition-outpost-status__next-cue i {
+  display: grid;
+  width: 24px;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid rgba(209, 154, 72, 0.40);
+  border-radius: 999px;
+  background: rgba(255, 248, 232, 0.82);
+  color: #8a5d1f;
+  font-family: Wellfleet, Georgia, serif;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.fp-expedition-outpost-status__next-cue strong,
+.fp-expedition-outpost-status__next-cue small {
+  min-width: 0;
+  overflow: hidden;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fp-expedition-outpost-status__next-cue strong {
+  color: #173f39;
+  font-family: Wellfleet, Georgia, serif;
+  font-size: 10px;
+}
+
+.fp-expedition-outpost-status__next-cue small {
+  color: #5b4831;
+  font-size: 9px;
+  font-weight: 900;
+}
+
 .fp-expedition-outpost-status .fp-expedition-audit-details {
   margin: 0;
 }
@@ -3934,5 +3983,647 @@ html, body {
   .fp-expedition-map-panel .fp-expedition-command-preview__actions .fp-brass-btn {
     padding: 4px 7px;
     font-size: 9px;
+  }
+}
+
+/* HQ17B option 1: runtime HUD composition, map-first with edge instruments. */
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-map-runtime {
+  isolation: isolate;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-map-card--board {
+  overflow: hidden;
+  background:
+    linear-gradient(145deg, rgba(27, 106, 100, 0.16), rgba(245, 212, 132, 0.10) 42%, rgba(35, 55, 46, 0.18)),
+    #173f39;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-map-card--board::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(90deg, rgba(12, 33, 30, 0.16), transparent 18% 78%, rgba(12, 33, 30, 0.20)),
+    linear-gradient(0deg, rgba(12, 33, 30, 0.24), transparent 28% 72%, rgba(255, 248, 232, 0.08));
+  pointer-events: none;
+}
+
+.fp-expedition-map-panel--hq17b-option1 > .fp-panel__head {
+  width: 52px;
+  height: 52px;
+  max-width: 52px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 44%, rgba(255, 248, 232, 0.98), rgba(245, 212, 132, 0.40) 58%, rgba(27, 106, 100, 0.86));
+}
+
+.fp-expedition-map-panel--hq17b-option1 > .fp-panel__head .fp-panel__title {
+  font-size: 0;
+}
+
+.fp-expedition-map-panel--hq17b-option1 > .fp-panel__head .fp-panel__title::before {
+  content: "◎";
+  color: #104540;
+  font-family: Wellfleet, Georgia, serif;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-crest,
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-objective,
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-map-visual-hud,
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-unit-roster,
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-location-visit {
+  position: absolute;
+  z-index: 6;
+  pointer-events: auto;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-crest {
+  top: 14px;
+  left: 76px;
+  display: grid;
+  width: min(276px, calc(100% - 452px));
+  min-height: 52px;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+  padding: 6px 8px;
+  border: 1px solid rgba(245, 212, 132, 0.42);
+  border-left-width: 1px;
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(22, 63, 57, 0.90), rgba(39, 84, 74, 0.76)),
+    rgba(255, 248, 232, 0.10);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 248, 232, 0.16),
+    0 16px 32px rgba(12, 33, 30, 0.28);
+  color: #fff8e8;
+  backdrop-filter: blur(10px);
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-crest > strong {
+  display: grid;
+  width: 38px;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid rgba(245, 212, 132, 0.46);
+  border-radius: 50%;
+  background: rgba(255, 248, 232, 0.14);
+  color: #f5d484;
+  font-size: 20px;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-crest .fp-expedition-map-status-symbols {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-crest .fp-expedition-map-status-symbols span {
+  min-width: 0;
+  padding: 5px 4px;
+  border-color: rgba(245, 212, 132, 0.30);
+  background: rgba(255, 248, 232, 0.12);
+  color: #fff8e8;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-crest > .fp-expedition-audit-details,
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-objective > .fp-expedition-audit-details {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-objective {
+  top: 80px;
+  left: 14px;
+  width: min(548px, calc(100% - 436px));
+  padding: 7px;
+  border: 1px solid rgba(245, 212, 132, 0.36);
+  border-left: 4px solid rgba(245, 212, 132, 0.74);
+  background:
+    linear-gradient(135deg, rgba(255, 248, 232, 0.88), rgba(223, 245, 241, 0.62)),
+    repeating-linear-gradient(90deg, rgba(46, 27, 14, 0.035) 0 1px, transparent 1px 16px);
+  box-shadow: 0 16px 34px rgba(12, 33, 30, 0.22);
+  backdrop-filter: blur(12px);
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-objective .fp-expedition-objective-strip__boundary {
+  display: none;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-objective .fp-expedition-guided-loop {
+  gap: 3px;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-objective .fp-expedition-guided-loop__step {
+  min-height: 42px;
+  padding: 4px;
+  background:
+    linear-gradient(135deg, rgba(255, 248, 232, 0.84), rgba(245, 212, 132, 0.20)),
+    rgba(223, 245, 241, 0.34);
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-objective .fp-expedition-survey-bridge {
+  align-items: stretch;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-map-visual-hud {
+  right: 76px;
+  bottom: 18px;
+  left: auto;
+  width: min(350px, calc(100% - 724px));
+  max-width: 350px;
+  padding: 0;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-fog-pips {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-fog-pip {
+  min-height: 34px;
+  grid-template-columns: 20px minmax(0, auto);
+  padding: 4px;
+  background: rgba(255, 248, 232, 0.78);
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-fog-pip i {
+  width: 19px;
+  font-size: 0;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-map-selected-summary {
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 7px;
+  background:
+    linear-gradient(135deg, rgba(255, 248, 232, 0.86), rgba(223, 245, 241, 0.68)),
+    rgba(255, 248, 232, 0.58);
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-map-selected-summary__head strong {
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-receipt-trace > small,
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-party-badges small {
+  display: none;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-unit-roster {
+  top: auto;
+  right: auto;
+  bottom: 16px;
+  left: 16px;
+  width: min(636px, calc(100% - 482px));
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 6px 8px;
+  align-items: center;
+  margin: 0;
+  padding: 7px;
+  border-color: rgba(245, 212, 132, 0.38);
+  background:
+    linear-gradient(135deg, rgba(255, 248, 232, 0.88), rgba(232, 213, 168, 0.74)),
+    repeating-linear-gradient(90deg, rgba(27, 106, 100, 0.036) 0 1px, transparent 1px 14px);
+  box-shadow: 0 18px 36px rgba(12, 33, 30, 0.26);
+  backdrop-filter: blur(12px);
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-unit-roster__head {
+  grid-row: 1 / 3;
+  display: grid;
+  width: 44px;
+  min-height: 72px;
+  place-items: center;
+  align-self: stretch;
+  border: 1px solid rgba(101, 74, 28, 0.22);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 50% 32%, rgba(245, 212, 132, 0.26), transparent 54%),
+    rgba(27, 106, 100, 0.12);
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-unit-roster__head strong {
+  font-size: 18px;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-unit-roster__head small {
+  max-width: 36px;
+  justify-content: center;
+  padding: 2px 4px;
+  font-size: 8px;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-unit-rail {
+  display: flex;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 1px 1px 3px;
+  scroll-snap-type: x proximity;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-unit-token {
+  flex: 0 0 72px;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 64px;
+  justify-items: center;
+  text-align: center;
+  scroll-snap-align: start;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-unit-token > i {
+  width: 42px;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-unit-token__meta {
+  width: 100%;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-unit-command-bar {
+  position: absolute;
+  left: min(50%, 420px);
+  bottom: calc(100% + 10px);
+  display: inline-flex;
+  max-width: min(560px, calc(100vw - 104px));
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 6px;
+  border: 1px solid rgba(245, 212, 132, 0.42);
+  border-radius: 999px;
+  background:
+    linear-gradient(135deg, rgba(27, 106, 100, 0.88), rgba(35, 75, 66, 0.80)),
+    rgba(255, 248, 232, 0.12);
+  box-shadow: 0 16px 32px rgba(12, 33, 30, 0.28);
+  transform: translateX(-50%);
+  backdrop-filter: blur(12px);
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-unit-command-bar small,
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-unit-command-bar span {
+  border-color: rgba(245, 212, 132, 0.26);
+  background: rgba(255, 248, 232, 0.12);
+  color: #fff8e8;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-unit-command-bar__button {
+  min-width: 34px;
+  min-height: 34px;
+  justify-content: center;
+  padding: 7px 9px;
+  border-radius: 50%;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-outpost-status {
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-outpost-status .fp-expedition-audit-details {
+  display: none;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-outpost-status__next-cue {
+  min-width: 122px;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-location-visit {
+  right: 76px;
+  bottom: 174px;
+  width: min(320px, calc(100% - 744px));
+  padding: 8px;
+  border-left-width: 1px;
+  background:
+    linear-gradient(135deg, rgba(255, 248, 232, 0.86), rgba(245, 212, 132, 0.28)),
+    rgba(223, 245, 241, 0.48);
+  box-shadow: 0 16px 32px rgba(12, 33, 30, 0.22);
+  backdrop-filter: blur(12px);
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-location-visit p,
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-location-visit .fp-expedition-audit-details {
+  display: none;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-location-visit__facts {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-ledger-rail {
+  top: 76px;
+  right: 14px;
+  bottom: 14px;
+  width: 54px;
+  padding: 6px;
+  overflow: hidden;
+  transition: width 180ms var(--at-ease), box-shadow 180ms var(--at-ease);
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-ledger-rail::before {
+  content: "⚿";
+  display: grid;
+  width: 38px;
+  aspect-ratio: 1;
+  place-items: center;
+  margin: 0 auto 6px;
+  border: 1px solid rgba(245, 212, 132, 0.36);
+  border-radius: 8px;
+  background: rgba(27, 106, 100, 0.20);
+  color: #104540;
+  font-family: Wellfleet, Georgia, serif;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-ledger-rail:hover,
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-ledger-rail:focus-within {
+  width: min(334px, calc(100% - 28px));
+  overflow: auto;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 248, 232, 0.46),
+    0 18px 40px rgba(12, 33, 30, 0.28);
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-ledger-rail > * {
+  transition: opacity 160ms var(--at-ease);
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-ledger-rail:not(:hover):not(:focus-within) > * {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-ledger-rail:not(:hover):not(:focus-within) > .fp-expedition-inspector-drawer__chrome {
+  opacity: 1;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-ledger-rail:not(:hover):not(:focus-within) .fp-expedition-inspector-drawer__chrome {
+  min-height: 40px;
+  padding: 4px;
+  border-radius: 7px;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-ledger-rail:not(:hover):not(:focus-within) .fp-expedition-inspector-drawer__chrome > strong,
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-ledger-rail:not(:hover):not(:focus-within) .fp-expedition-inspector-drawer__chrome > span,
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-ledger-rail:not(:hover):not(:focus-within) .fp-expedition-inspector-drawer__chips {
+  display: none;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-ledger-rail:not(:hover):not(:focus-within) .fp-expedition-inspector-drawer__chrome > small {
+  display: grid;
+  width: 32px;
+  aspect-ratio: 1;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(255, 248, 232, 0.70);
+  color: #104540;
+  font-size: 15px;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-command-preview {
+  right: auto;
+  bottom: 154px;
+  left: 28px;
+}
+
+.fp-expedition-map-body--hq17b-option1 .fp-expedition-command-outcome {
+  bottom: 112px;
+  left: 28px;
+}
+
+@media (max-width: 1100px) {
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-crest {
+    width: min(260px, calc(100% - 112px));
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-objective {
+    width: min(510px, calc(100% - 92px));
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-unit-roster {
+    width: min(620px, calc(100% - 104px));
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-map-visual-hud,
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-location-visit {
+    right: 72px;
+    width: min(330px, calc(100% - 104px));
+  }
+}
+
+@media (max-width: 900px) {
+  .fp-expedition-map-panel--hq17b-option1 > .fp-panel__head {
+    width: 46px;
+    height: 46px;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-crest {
+    top: 10px;
+    left: 64px;
+    width: calc(100% - 130px);
+    min-height: 46px;
+    grid-template-columns: 34px minmax(0, 1fr);
+    padding: 5px 6px;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-crest > strong {
+    width: 32px;
+    font-size: 17px;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-objective {
+    top: 62px;
+    right: 10px;
+    left: 10px;
+    width: auto;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-objective .fp-expedition-guided-loop__step small,
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-objective .fp-expedition-guided-loop__step em {
+    display: none;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-objective .fp-expedition-guided-loop__step {
+    min-height: 34px;
+    grid-template-columns: 18px minmax(0, 1fr);
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-map-visual-hud {
+    right: 10px;
+    bottom: 10px;
+    left: 10px;
+    width: auto;
+    max-width: none;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-unit-roster {
+    right: 10px;
+    bottom: 132px;
+    left: 10px;
+    width: auto;
+    max-height: 178px;
+    grid-template-columns: 42px minmax(0, 1fr);
+    overflow: visible;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-unit-roster__head {
+    width: 38px;
+    min-height: 62px;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-unit-command-bar {
+    left: 50%;
+    bottom: calc(100% + 8px);
+    max-width: calc(100vw - 28px);
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-location-visit {
+    right: 10px;
+    bottom: 330px;
+    left: 10px;
+    width: auto;
+    max-height: 104px;
+    overflow: hidden;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-ledger-rail {
+    top: 118px;
+    right: 10px;
+    bottom: auto;
+    width: 46px;
+    max-height: 170px;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-ledger-rail:hover,
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-ledger-rail:focus-within {
+    width: calc(100% - 20px);
+    max-height: min(42svh, 320px);
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-command-preview {
+    right: 10px;
+    bottom: 236px;
+    left: 10px;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-command-outcome {
+    right: 10px;
+    bottom: 196px;
+    left: 10px;
+  }
+}
+
+@media (max-width: 520px) {
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-crest {
+    width: calc(100% - 118px);
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-crest .fp-expedition-map-status-symbols span {
+    padding: 4px 2px;
+    font-size: 9px;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-objective {
+    max-height: 126px;
+    overflow: hidden;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-objective .fp-expedition-objective-strip__facts {
+    display: none;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-objective .fp-expedition-survey-bridge {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow-x: auto;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-objective .fp-expedition-survey-bridge[data-actions="1"] {
+    grid-template-columns: repeat(3, minmax(62px, 1fr)) minmax(58px, auto);
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-map-visual-hud {
+    bottom: 8px;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-fog-pips {
+    display: none;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-map-selected-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-map-selected-summary__chips {
+    justify-content: flex-start;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-party-badges {
+    grid-column: 1;
+    justify-content: flex-start;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-unit-roster {
+    bottom: 112px;
+    grid-template-columns: 36px minmax(0, 1fr);
+    max-height: 142px;
+    padding: 5px;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-unit-roster__head {
+    width: 32px;
+    min-height: 54px;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-unit-token {
+    flex-basis: 68px;
+    min-height: 58px;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-unit-token > i {
+    width: 38px;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-unit-command-bar {
+    max-height: 84px;
+    overflow: auto;
+    border-radius: 8px;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-outpost-status {
+    display: none;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-location-visit {
+    display: none;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-ledger-rail {
+    top: 104px;
+    width: 42px;
+    max-height: 120px;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-ledger-rail::before {
+    width: 32px;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-command-preview {
+    bottom: 212px;
+  }
+
+  .fp-expedition-map-body--hq17b-option1 .fp-expedition-command-outcome {
+    bottom: 172px;
   }
 }

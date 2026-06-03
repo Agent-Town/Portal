@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "generatedAt": "2026-06-02T13:05:34.530Z",
+  "generatedAt": "2026-06-03T03:18:35.744Z",
   "title": "HQ16Q Outpost Status Map Surface",
   "source": "FP-E2E-022Q mocked existing server-owned owned_outpost cell and outpost_crew unit read model",
   "screenshots": [
@@ -15,7 +15,18 @@
       "foundedPlotId": "plot_hq16q_outpost",
       "readOnly": "true",
       "actions": "0",
-      "text": "⌂ Set\n● Q0 R1\n◇ Q1 R1\n0 ✦\nDETAILS"
+      "mapNativeCue": "next_scout",
+      "text": "⌂ Set\n● Q0 R1\n◇ Q1 R1\n0 ✦\n⌖\nNext Scout\nQ1 R1\nDETAILS"
+    },
+    "nextScoutCue": {
+      "present": true,
+      "commandId": "scout_sector",
+      "cellId": "cell_q1_r1",
+      "visualOnly": "true",
+      "readOnly": "true",
+      "actions": 0,
+      "routeAuthority": "false",
+      "text": "⌖\nNext Scout\nQ1 R1"
     },
     "details": {
       "present": true,
@@ -124,6 +135,8 @@
         {
           "unitId": "expedition_unit_outpost_crew_claim_hq16q_ridge",
           "unitType": "outpost_crew",
+          "commandId": "scout_sector",
+          "cueLabel": "Next Scout",
           "originCellId": "cell_q0_r1",
           "targetCellId": "cell_q1_r1",
           "targetFogState": "hinted",
@@ -144,8 +157,8 @@
       ]
     },
     "primaryText": {
-      "outpostStatus": "⌂ Set\n● Q0 R1\n◇ Q1 R1\n0 ✦\nDETAILS",
-      "unitRoster": "◉\n1 ◉\n⌂\n⌂\n◆\n0\n⌂ ⌂\n◎\n0 ↦\n⏳\n⌂ Set\n● Q0 R1\n◇ Q1 R1\n0 ✦\nDETAILS",
+      "outpostStatus": "⌂ Set\n● Q0 R1\n◇ Q1 R1\n0 ✦\n⌖\nNext Scout\nQ1 R1\nDETAILS",
+      "unitRoster": "◉\n1 ◉\n⌂\n⌂\n◆\n0\n⌂ ⌂\n◎\n0 ↦\n⏳\n⌂ Set\n● Q0 R1\n◇ Q1 R1\n0 ✦\n⌖\nNext Scout\nQ1 R1\nDETAILS",
       "selectedSummary": "⌂\n⌂\n◆\n◆\n○\n1 ⚿\n0 ◉\n⚿\n1 ⚿"
     },
     "mobileFit": {
@@ -172,6 +185,7 @@
     "detailsDrawerAvailable": true,
     "detailsDrawerCollapsedByDefault": true,
     "noClientOutpostAuthority": true,
+    "mapNativeNextScoutCue": true,
     "primarySurfacePaperworkHidden": true,
     "rendererCreatedNoActions": true,
     "unitTokensReadOnly": true,

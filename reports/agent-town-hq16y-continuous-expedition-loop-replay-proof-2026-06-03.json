@@ -1,0 +1,475 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-03T05:12:21.497Z",
+  "title": "HQ16Y Continuous Expedition Map Loop Replay",
+  "source": "FP-E2E-022Y live Playwright replay using current guarded UI endpoints; only convoy arrival used the existing test-only time advance after Prepare Convoy.",
+  "branch": "neo/progression-atlas-editor-next-2026-05-29",
+  "screenshots": [
+    "reports/agent-town-hq16y-continuous-expedition-loop-replay-2026-06-03-01-scout-ready.png",
+    "reports/agent-town-hq16y-continuous-expedition-loop-replay-2026-06-03-02-convoy-rolling.png",
+    "reports/agent-town-hq16y-continuous-expedition-loop-replay-2026-06-03-03-outpost-bridge.png"
+  ],
+  "replaySteps": [
+    {
+      "step": "scout_sector_to_event_packet",
+      "cellId": "cell_q1_r0",
+      "packetId": "expedition_event_packet_82ed5aba4c267b8e"
+    },
+    {
+      "step": "event_packet_to_packet_site_plan",
+      "packetId": "expedition_event_packet_82ed5aba4c267b8e",
+      "planId": "site_plan_expedition_event_packet_82ed5aba4c267b8e"
+    },
+    {
+      "step": "site_plan_review_to_surveyor_prepare_convoy",
+      "planId": "site_plan_expedition_event_packet_82ed5aba4c267b8e"
+    },
+    {
+      "step": "surveyor_prepare_convoy_to_settler_convoy",
+      "planId": "site_plan_expedition_event_packet_82ed5aba4c267b8e",
+      "claimId": "claim_41cb0183f180e561"
+    },
+    {
+      "step": "arrival_gated_found_outpost_to_outpost_crew",
+      "claimId": "claim_41cb0183f180e561",
+      "foundedPlotId": "plot_b6b7a64c88924e48"
+    },
+    {
+      "step": "outpost_crew_to_next_scout_bridge",
+      "originCellId": "cell_q1_r0",
+      "targetCellId": "cell_q2_r-1",
+      "packetId": "expedition_event_packet_5f08ce892b3ad80a"
+    }
+  ],
+  "requests": {
+    "firstScout": {
+      "revealedCellId": "cell_q1_r0",
+      "packetId": "expedition_event_packet_82ed5aba4c267b8e",
+      "boundaryFlags": {
+        "samePlotOnly": true,
+        "serverOwnedDiscoveryReceipt": true,
+        "revealsExactlyOneSector": true,
+        "autonomousMovement": false,
+        "resourceHarvesting": false,
+        "resourceDelta": {},
+        "routeCreation": false,
+        "tradeRouteCreation": false,
+        "backgroundScheduling": false,
+        "combat": false,
+        "publicSharing": false,
+        "generatedUniverseRendering": false,
+        "crossPlotMutation": false,
+        "atlasExecution": false,
+        "externalEffects": false
+      }
+    },
+    "packetSitePlan": {
+      "packetId": "expedition_event_packet_82ed5aba4c267b8e",
+      "planId": "site_plan_expedition_event_packet_82ed5aba4c267b8e",
+      "cellId": "cell_q1_r0",
+      "boundaryFlags": {
+        "samePlotOnly": true,
+        "createsSitePlan": true,
+        "createsSurveyor": false,
+        "planningRecordOnly": true,
+        "reviewed": false,
+        "autonomousMovement": false,
+        "operatorAssignment": false,
+        "resourceHarvesting": false,
+        "resourceDelta": {},
+        "resourceGain": false,
+        "resourceLoss": false,
+        "routeCreation": false,
+        "tradeRouteCreation": false,
+        "rewardCreation": false,
+        "backgroundScheduling": false,
+        "combat": false,
+        "publicSharing": false,
+        "generatedUniverseRendering": false,
+        "hiddenTruthLeakage": false,
+        "crossPlotMutation": false,
+        "atlasExecution": false,
+        "externalEffects": false
+      }
+    },
+    "review": {
+      "planId": "site_plan_expedition_event_packet_82ed5aba4c267b8e",
+      "reviewStatus": "reviewed",
+      "nextCommandId": "prepare_settler_convoy"
+    },
+    "prepareConvoy": {
+      "claimId": "claim_41cb0183f180e561",
+      "status": "CONVOY_PREPARING",
+      "sitePlanId": "site_plan_expedition_event_packet_82ed5aba4c267b8e"
+    },
+    "convoyArrival": {
+      "claimId": "claim_41cb0183f180e561",
+      "status": "CONVOY_ARRIVED",
+      "worldDeltaTypes": [
+        "SETTLER_CONVOY_ARRIVED"
+      ],
+      "existingTestAdvanceOnly": true
+    },
+    "foundOutpost": {
+      "claimId": "claim_41cb0183f180e561",
+      "foundedPlotId": "plot_b6b7a64c88924e48"
+    },
+    "nextScout": {
+      "revealedCellId": "cell_q2_r-1",
+      "packetId": "expedition_event_packet_5f08ce892b3ad80a",
+      "boundaryFlags": {
+        "samePlotOnly": true,
+        "serverOwnedDiscoveryReceipt": true,
+        "revealsExactlyOneSector": true,
+        "autonomousMovement": false,
+        "resourceHarvesting": false,
+        "resourceDelta": {},
+        "routeCreation": false,
+        "tradeRouteCreation": false,
+        "backgroundScheduling": false,
+        "combat": false,
+        "publicSharing": false,
+        "generatedUniverseRendering": false,
+        "crossPlotMutation": false,
+        "atlasExecution": false,
+        "externalEffects": false
+      }
+    }
+  },
+  "proof": {
+    "renderer": {
+      "selectedCellId": "cell_q0_r1",
+      "commandTargets": [
+        {
+          "unitId": "expedition_unit_pathfinder_scout_v1",
+          "unitType": "scout",
+          "commandId": "move_unit",
+          "cellId": "cell_q1_r0",
+          "fogState": "discovered",
+          "serverMutationImplemented": true,
+          "movementMutation": true,
+          "visualOnly": true,
+          "readOnly": true,
+          "previewOnly": true,
+          "selectable": true,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "canvas": {
+            "x": 189.25353397172825,
+            "y": 374.6691176470588
+          }
+        },
+        {
+          "unitId": "expedition_unit_pathfinder_scout_v1",
+          "unitType": "scout",
+          "commandId": "scout_sector",
+          "cellId": "cell_q1_r-1",
+          "fogState": "hinted",
+          "serverMutationImplemented": true,
+          "movementMutation": false,
+          "visualOnly": true,
+          "readOnly": true,
+          "previewOnly": true,
+          "selectable": true,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "canvas": {
+            "x": 172.74646602827178,
+            "y": 346.27696078431376
+          }
+        },
+        {
+          "unitId": "expedition_unit_pathfinder_scout_v1",
+          "unitType": "scout",
+          "commandId": "scout_sector",
+          "cellId": "cell_q2_r-2",
+          "fogState": "hinted",
+          "serverMutationImplemented": true,
+          "movementMutation": false,
+          "visualOnly": true,
+          "readOnly": true,
+          "previewOnly": true,
+          "selectable": true,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "canvas": {
+            "x": 189.25353397172825,
+            "y": 317.8848039215686
+          }
+        }
+      ],
+      "outpostNextFrontierBeacons": [],
+      "visualLayers": {
+        "terrainTexture": true,
+        "runtimeRegionAssetPack": "hq14s_public_terrain_underlay_v1",
+        "runtimeRegionAtlas": "/experiences/founders-plot/assets/expedition-map/hq14s-public-terrain-underlay-v1/manifest.json",
+        "runtimeTerrainUnderlay": "/experiences/founders-plot/assets/expedition-map/hq14s-public-terrain-underlay-v1/public-terrain-underlay-candidate-01-v1.png",
+        "runtimeSpriteAssetPack": "hq15e_expedition_unit_marker_sprites_v1",
+        "runtimeSpriteAtlas": "/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/manifest.json",
+        "generatedSpriteAssets": true,
+        "generatedSpriteAssetCount": 8,
+        "generatedSpriteAssetsReady": 8,
+        "generatedSpriteAssetsVisualOnly": true,
+        "generatedSpriteAssetsReadOnly": true,
+        "serverTerrainAssetContractVersion": "agenttown_public_terrain_asset_slots_v1",
+        "serverTerrainSlotSource": "server_read_model_v1",
+        "assetBackedRegionTiles": 14,
+        "assetBackedLoadedTiles": 14,
+        "assetBackedTerrainTextures": true,
+        "continuousTerrainUnderlay": true,
+        "continuousTerrainUnderlayVersion": "hq14t_server_bound_terrain_underlay_v1",
+        "continuousUnderlayUsesServerOwnedCells": true,
+        "continuousUnderlayHiddenCellsFogOnly": true,
+        "continuousUnderlayVisualOnly": true,
+        "plateBlendLayer": true,
+        "softRegionSeams": true,
+        "reducedPlateEdgeContrast": true,
+        "centerTileMutedForUnderlay": true,
+        "cartographicFogDepth": true,
+        "ambientContourField": true,
+        "fogDepthGlyphsVisualOnly": true,
+        "terrainUnderlayCount": 1,
+        "proceduralFallbackWhenAssetPending": true,
+        "candidate02Cues": true,
+        "agentTownIdentityCues": true,
+        "scoutLedgerHud": true,
+        "mapFirstHudOverlays": true,
+        "hoverAffordance": true,
+        "selectedSectorOutline": true,
+        "beaconPlanWagonCues": true,
+        "homeNodeEmphasis": true,
+        "riverFlatCues": true,
+        "waterCuesServerGated": true,
+        "woodlandRidgeCues": true,
+        "ruinSignalCues": true,
+        "ruinSignalCuesServerGated": true,
+        "lockedUnknownSealedFogOnly": true,
+        "hintedAbstractFogEdge": true,
+        "frontierBoundaryDashes": true,
+        "frontierBoundaryVisualOnly": true,
+        "fogVeils": 11,
+        "edgeFogCount": 4,
+        "civicBeaconCount": 3,
+        "surveyStrokeCount": 9,
+        "surveyStrokesVisualOnly": true,
+        "receiptTraceVisualOnly": true,
+        "markerCount": 14,
+        "eventPacketMarkers": true,
+        "eventPacketMarkerCount": 2,
+        "objectiveMarkers": true,
+        "objectiveMarkerCount": 1,
+        "eventObjectiveMarkersVisualOnly": true,
+        "eventObjectiveMarkersReadOnly": true,
+        "eventObjectiveMarkersInspectable": true,
+        "eventObjectiveMarkerAuthority": false,
+        "outpostNextFrontierBeacon": true,
+        "outpostNextFrontierBeaconCount": 0,
+        "outpostNextFrontierBeaconVisualOnly": true,
+        "outpostNextFrontierBeaconReadOnly": true,
+        "outpostNextFrontierBeaconSelectable": false,
+        "outpostNextFrontierBeaconAuthority": false,
+        "outpostNextFrontierBeaconHiddenTruthLeakage": false,
+        "unitTokens": true,
+        "unitTokenCount": 5,
+        "unitTokensReadOnly": true,
+        "unitMovementMutationImplemented": true,
+        "commandTargetRings": true,
+        "commandTargetCount": 3,
+        "commandTargetRingsVisualOnly": true,
+        "commandTargetRingsReadOnly": true,
+        "commandTargetRingsSelectable": true,
+        "commandTargetRingsPreviewOnly": true,
+        "commandTargetRingAuthority": false,
+        "commandOutcomeFeedback": false,
+        "commandOutcomeFeedbackCount": 0,
+        "commandOutcomeFeedbackVisualOnly": true,
+        "commandOutcomeFeedbackReadOnly": true,
+        "commandOutcomeFeedbackServerOwned": true,
+        "commandOutcomeFeedbackSelectable": false,
+        "commandOutcomeFeedbackAuthority": false,
+        "clientAuthority": false
+      }
+    },
+    "outpostStatus": {
+      "selectedBeforeNextScout": {
+        "present": true,
+        "unitId": "expedition_unit_outpost_crew_claim_41cb0183f180e561",
+        "cellId": "cell_q1_r0",
+        "actions": 0,
+        "readOnly": "true"
+      },
+      "mobilePresent": false,
+      "mobileUnitId": "",
+      "mobileCellId": "",
+      "mobileActions": 0,
+      "mobileReadOnly": ""
+    },
+    "outcome": {
+      "commandId": "",
+      "cellId": "",
+      "serverOwnedResult": "",
+      "text": ""
+    },
+    "cells": [
+      {
+        "cellId": "cell_origin",
+        "fogState": "discovered"
+      },
+      {
+        "cellId": "cell_q1_r0",
+        "fogState": "discovered"
+      },
+      {
+        "cellId": "cell_q2_r-1",
+        "fogState": "known"
+      },
+      {
+        "cellId": "cell_q0_r1",
+        "fogState": "hinted"
+      },
+      {
+        "cellId": "cell_q1_r-1",
+        "fogState": "hinted"
+      },
+      {
+        "cellId": "cell_q2_r-2",
+        "fogState": "hinted"
+      },
+      {
+        "cellId": "cell_q-3_r0",
+        "fogState": "locked_unknown"
+      },
+      {
+        "cellId": "cell_q-3_r3",
+        "fogState": "locked_unknown"
+      },
+      {
+        "cellId": "cell_q0_r-3",
+        "fogState": "locked_unknown"
+      },
+      {
+        "cellId": "cell_q0_r3",
+        "fogState": "locked_unknown"
+      },
+      {
+        "cellId": "cell_q3_r-3",
+        "fogState": "locked_unknown"
+      },
+      {
+        "cellId": "cell_q3_r0",
+        "fogState": "locked_unknown"
+      },
+      {
+        "cellId": "cell_q3_r3",
+        "fogState": "locked_unknown"
+      },
+      {
+        "cellId": "cell_q6_r-3",
+        "fogState": "locked_unknown"
+      }
+    ],
+    "loopCells": {
+      "firstScoutTarget": "cell_q1_r0",
+      "nextScoutTarget": "cell_q2_r-1"
+    },
+    "mobileFit": {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "documentScrollWidth": 390,
+      "clipped": []
+    }
+  },
+  "outpostBridgeBeforeNextScout": {
+    "selectedUnitId": "expedition_unit_outpost_crew_claim_41cb0183f180e561",
+    "originCellId": "cell_q1_r0",
+    "targetCellId": "cell_q2_r-1",
+    "beacon": {
+      "unitId": "expedition_unit_outpost_crew_claim_41cb0183f180e561",
+      "unitType": "outpost_crew",
+      "commandId": "scout_sector",
+      "cueLabel": "Next Scout",
+      "originCellId": "cell_q1_r0",
+      "targetCellId": "cell_q2_r-1",
+      "targetFogState": "hinted",
+      "targetKind": "frontier_hint",
+      "derivedFrom": "sourceIds.adjacentCellId",
+      "visualOnly": true,
+      "readOnly": true,
+      "selectable": false,
+      "routeAuthority": false,
+      "actionAuthority": false,
+      "executableActions": 0,
+      "hiddenTruthLeakage": false,
+      "canvas": {
+        "x": 697.9945280437756,
+        "y": 292.9774509803922
+      }
+    },
+    "beaconCount": 1,
+    "objectiveMarkers": [
+      {
+        "mode": "scout",
+        "targetCellId": "cell_q1_r-1",
+        "packetId": "expedition_event_packet_82ed5aba4c267b8e",
+        "spriteAssetSlot": "objective_beacon",
+        "spriteAssetPath": "/experiences/founders-plot/assets/expedition-map/hq15e-expedition-unit-marker-sprites-v1/objective-beacon-v1.png",
+        "spriteAssetReady": true,
+        "visualOnly": true,
+        "readOnly": true,
+        "selectable": true,
+        "inspectable": true,
+        "routeAuthority": false,
+        "actionAuthority": false,
+        "executableActions": 0,
+        "canvas": {
+          "x": 620.3135886912904,
+          "y": 258.6656862745098
+        }
+      }
+    ],
+    "visualLayers": {
+      "clientAuthority": false,
+      "outpostNextFrontierBeaconReadOnly": true,
+      "outpostNextFrontierBeaconVisualOnly": true,
+      "outpostNextFrontierBeaconSelectable": false,
+      "outpostNextFrontierBeaconAuthority": false
+    }
+  },
+  "harnessControls": {
+    "seededHqAndExpeditionBoard": true,
+    "usedExistingTestAdvanceForConvoyArrivalOnlyAfterPrepare": true,
+    "mockedBrowserApiRoutes": false,
+    "storeMutationGameplayAuthority": false
+  },
+  "guardrails": {
+    "scoutSectorOnlyFogRevealPath": true,
+    "packetPlanUsedExistingEndpoint": true,
+    "packetPlanCreatesSurveyorBlocked": true,
+    "packetPlanCreatesConvoyBlocked": true,
+    "packetPlanCreatesSettlementBlocked": true,
+    "reviewUsedExistingEndpoint": true,
+    "prepareEndpointUsed": true,
+    "convoyArrivalUsedExistingTestAdvance": true,
+    "foundEndpointUsed": true,
+    "outpostStatusReadOnly": true,
+    "outpostBridgeVisualOnly": true,
+    "commandTargetRingsPreviewOnly": true,
+    "rendererCreatedNoActions": true,
+    "routeAuthority": false,
+    "tradeRouteCreation": false,
+    "resourceHarvesting": false,
+    "rewardCreation": false,
+    "backgroundScheduling": false,
+    "combat": false,
+    "hiddenTruthLeakage": false,
+    "atlasExecution": false,
+    "generatedUniverseRuntimeExpansion": false,
+    "externalEffects": false,
+    "mobileHorizontalOverflow": 0
+  }
+}

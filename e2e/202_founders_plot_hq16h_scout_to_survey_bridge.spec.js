@@ -393,8 +393,9 @@ test('FP-E2E-022H Scout Packet to Site Plan bridge is map-first and read-only', 
   await expect(page.getByTestId('fp-expedition-survey-bridge')).toHaveAttribute('data-actions', '0');
   await expect(page.getByTestId('fp-expedition-survey-bridge')).toHaveAttribute('data-status', 'PACKET_READY_FOR_SITE_PLAN_PREFLIGHT');
   await expect(page.getByTestId('fp-expedition-survey-bridge')).toHaveAttribute('data-server-mutation-implemented', 'false');
-  await expect(page.getByTestId('fp-expedition-survey-bridge-step-packet')).toContainText('PKT');
-  await expect(page.getByTestId('fp-expedition-survey-bridge-step-site-plan')).toContainText('SVY');
+  await expect(page.getByTestId('fp-expedition-survey-bridge')).toHaveAttribute('data-map-native-verb', 'Plan');
+  await expect(page.getByTestId('fp-expedition-survey-bridge-step-packet')).toContainText('Scout');
+  await expect(page.getByTestId('fp-expedition-survey-bridge-step-site-plan')).toContainText('Plan');
   await expect(page.getByTestId('fp-expedition-survey-bridge-step-command')).toContainText('Wait');
   await expect(page.getByTestId('fp-expedition-survey-bridge').locator('button')).toHaveCount(0);
   await page.getByTestId('fp-expedition-map-panel').screenshot({ path: 'reports/agent-town-hq16h-scout-to-survey-bridge-desktop-2026-06-02.png' });
@@ -451,6 +452,7 @@ test('FP-E2E-022H Scout Packet to Site Plan bridge is map-first and read-only', 
         readOnly: bridge?.getAttribute('data-read-only') || '',
         actions: Number(bridge?.getAttribute('data-actions') || 0),
         status: bridge?.getAttribute('data-status') || '',
+        mapNativeVerb: bridge?.getAttribute('data-map-native-verb') || '',
         serverMutationImplemented: bridge?.getAttribute('data-server-mutation-implemented') || '',
         packetId: bridge?.getAttribute('data-packet-id') || '',
         cellId: bridge?.getAttribute('data-cell-id') || '',
@@ -507,6 +509,7 @@ test('FP-E2E-022H Scout Packet to Site Plan bridge is map-first and read-only', 
       objectiveButtons: proof.objective.buttons,
       bridgeReadOnly: proof.bridge.readOnly === 'true' && proof.mapBridge.readOnly === 'true',
       bridgeActions: proof.bridge.actions + proof.mapBridge.actions,
+      mapNativePlanVerb: proof.bridge.mapNativeVerb === 'Plan',
       stepActions: [...proof.bridge.steps, ...proof.mapBridge.steps].reduce((sum, step) => sum + step.actions, 0),
       surveyCommandFabricatedInFrontend: false,
       serverMutationImplemented: proof.bridge.serverMutationImplemented === 'true',

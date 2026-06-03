@@ -1105,6 +1105,7 @@
     const hud = document.createElement('div');
     hud.className = 'fp-expedition-map-visual-hud';
     hud.dataset.testid = 'fp-expedition-map-visual-hud';
+    hud.dataset.hudInstrument = 'selected-context';
     hud.dataset.selectedCellId = String(selectedCell.cellId || '');
     hud.dataset.fogState = fogState;
     hud.dataset.scoutable = selectedScoutable ? 'true' : 'false';
@@ -1112,6 +1113,7 @@
     const fogRail = document.createElement('div');
     fogRail.className = 'fp-expedition-fog-pips';
     fogRail.dataset.testid = 'fp-expedition-fog-pips';
+    fogRail.dataset.hudInstrument = 'fog-pips';
     EXPEDITION_FOG_ORDER.forEach((stateKey) => {
       const info = expeditionFogDefinition(stateKey);
       const pip = document.createElement('span');
@@ -1142,6 +1144,7 @@
     selected.dataset.scoutable = selectedScoutable ? 'true' : 'false';
     selected.dataset.receiptCount = String(expeditionReceiptCount(selectedCell, packet));
     selected.dataset.partyCount = String(partyMembers.length);
+    selected.dataset.hudInstrument = 'selected-sector';
     selected.title = [
       `Selected ${selectedCell.cellId || 'cell'}`,
       `${friendlyToken(fogState)} fog`,
@@ -1342,6 +1345,8 @@
     surface.dataset.bridgeCommandId = outpost.nextCell ? 'scout_sector' : '';
     surface.dataset.bridgeReadOnly = 'true';
     surface.dataset.bridgeActions = '0';
+    surface.dataset.hudInstrument = 'outpost-context';
+    if (outpost.nextCell?.cellId) surface.dataset.mapNativeCue = 'next_scout';
 
     const chips = document.createElement('div');
     chips.className = 'fp-expedition-outpost-status__chips';
@@ -1367,6 +1372,31 @@
       chips.appendChild(chip);
     });
     surface.appendChild(chips);
+
+    if (outpost.nextCell?.cellId) {
+      const cue = document.createElement('div');
+      cue.className = 'fp-expedition-outpost-status__next-cue';
+      cue.dataset.testid = 'fp-expedition-outpost-next-scout-cue';
+      cue.dataset.commandId = 'scout_sector';
+      cue.dataset.cellId = String(outpost.nextCell.cellId || '');
+      cue.dataset.visualOnly = 'true';
+      cue.dataset.readOnly = 'true';
+      cue.dataset.actions = '0';
+      cue.dataset.routeAuthority = 'false';
+      cue.dataset.resourceDelta = '{}';
+      cue.dataset.hudInstrument = 'next-scout-cue';
+      cue.title = `Next Scout cue for ${outpost.nextCell.cellId}. The actual mutation remains the existing Scout Sector command.`;
+      cue.setAttribute('aria-label', cue.title);
+      const icon = document.createElement('i');
+      icon.textContent = '⌖';
+      icon.setAttribute('aria-hidden', 'true');
+      const label = document.createElement('strong');
+      label.textContent = 'Next Scout';
+      const target = document.createElement('small');
+      target.textContent = expeditionCompactCellLabel(outpost.nextCell.cellId);
+      cue.append(icon, label, target);
+      surface.appendChild(cue);
+    }
 
     const detailBody = document.createElement('div');
     detailBody.className = 'fp-expedition-inspector-section__body';
@@ -1415,6 +1445,7 @@
     roster.dataset.readOnly = 'true';
     roster.dataset.actions = '0';
     roster.dataset.movementMutation = movementReady ? 'true' : 'false';
+    roster.dataset.hudInstrument = 'unit-dock';
 
     const head = document.createElement('div');
     head.className = 'fp-expedition-unit-roster__head';
@@ -1497,6 +1528,7 @@
       commandBar.dataset.readOnly = 'true';
       commandBar.dataset.movementMutation = selectedUnit.movement?.movementMutationImplemented === true ? 'true' : 'false';
       commandBar.dataset.actions = String(actionCount);
+      commandBar.dataset.hudInstrument = 'command-puck';
       const label = document.createElement('small');
       label.className = 'fp-expedition-unit-command-bar__unit';
       label.dataset.testid = 'fp-expedition-unit-command-selected';
@@ -1884,9 +1916,9 @@
       case 'scout_sector':
         return { label: 'Scouted', icon: '⌖' };
       case 'draft_site_plan_from_packet':
-        return { label: 'Surveyed', icon: '▧' };
+        return { label: 'Planned', icon: '◇' };
       case 'review_site_plan':
-        return { label: 'Ready', icon: '▣' };
+        return { label: 'Reviewed', icon: '✓' };
       case 'prepare_settler_convoy':
         return { label: 'Convoy', icon: '▣' };
       case 'found_settlement':
@@ -2152,7 +2184,7 @@
     const key = String(status || '').toUpperCase();
     if (key === 'SURVEYOR_COMMAND_READY') return 'Ready';
     if (key === 'SITE_PLAN_PRESENT') return 'Ready';
-    if (key === 'PACKET_READY_FOR_SITE_PLAN_PREFLIGHT') return 'Survey';
+    if (key === 'PACKET_READY_FOR_SITE_PLAN_PREFLIGHT') return 'Plan';
     if (key === 'WAITING_FOR_SCOUT_PACKET') return 'Scout';
     return friendlyToken(status || 'Ready');
   }
@@ -2340,9 +2372,9 @@
       case 'scout_sector':
         return 'Scout';
       case 'draft_site_plan_from_packet':
-        return 'Survey';
+        return 'Plan';
       case 'review_site_plan':
-        return 'Ready';
+        return 'Review';
       case 'prepare_settler_convoy':
         return 'Convoy';
       case 'found_settlement':
@@ -2350,7 +2382,7 @@
       case 'review_packet':
         return 'Marker';
       case 'survey_site_plan_contract_required':
-        return 'Survey';
+        return 'Plan';
       default:
         return fallback || 'Inspect';
     }
@@ -2363,9 +2395,9 @@
       case 'scout_sector':
         return '⌖';
       case 'draft_site_plan_from_packet':
-        return '▧';
+        return '◇';
       case 'review_site_plan':
-        return '▣';
+        return '✓';
       case 'prepare_settler_convoy':
         return '▣';
       case 'found_settlement':
@@ -2373,7 +2405,7 @@
       case 'review_packet':
         return '⚿';
       case 'survey_site_plan_contract_required':
-        return '▧';
+        return '◇';
       default:
         return '◎';
     }
@@ -2624,6 +2656,7 @@
     rail.dataset.serverMutationImplemented = commandState.serverMutationImplemented === true ? 'true' : 'false';
     rail.dataset.commandId = String(commandState.commandId || '');
     rail.dataset.actionName = String(commandState.actionName || '');
+    rail.dataset.mapNativeVerb = expeditionGuidedCommandLabel(commandState.commandId, commandState.label);
     if (reviewPlanId) rail.dataset.planId = reviewPlanId;
     if (pendingPacketPlan || pendingReviewPlan || pendingConvoyPlan) rail.dataset.pending = 'true';
     rail.title = bridge.ledgerText || 'Scout Packet to Site Plan bridge is read-only readiness only.';
@@ -2640,7 +2673,7 @@
       {
         phase: 'site-plan',
         code: '▧',
-        label: candidate.sitePlan?.planId ? 'Site' : 'Survey',
+        label: candidate.sitePlan?.planId ? 'Site' : 'Plan',
         meta: statusLabel,
         testId: `${testId}-step-site-plan`,
       },
@@ -2684,9 +2717,10 @@
       button.dataset.serverMutationImplemented = 'true';
       button.dataset.routeAuthority = 'false';
       button.dataset.resourceDelta = '{}';
+      button.dataset.mapNativeVerb = 'Plan';
       button.disabled = pendingPacketPlan;
       button.textContent = pendingPacketPlan ? '...' : expeditionGuidedCommandLabel(commandState.commandId, commandState.label);
-      button.title = `Draft one planning-only Site Plan from ${packetId}. No route, resource, reward, Surveyor, Atlas execution, or external effect.`;
+      button.title = `Plan from map marker ${packetId} through the guarded packet Site Plan endpoint. No route, resource, reward, Surveyor, Atlas execution, or external effect.`;
       button.setAttribute('aria-label', button.title);
       button.addEventListener('click', () => doDraftSitePlanFromPacket(packetId, cellId));
       rail.appendChild(button);
@@ -2704,9 +2738,10 @@
       button.dataset.serverMutationImplemented = 'true';
       button.dataset.routeAuthority = 'false';
       button.dataset.resourceDelta = '{}';
+      button.dataset.mapNativeVerb = 'Review';
       button.disabled = pendingReviewPlan;
       button.textContent = pendingReviewPlan ? '...' : expeditionGuidedCommandLabel(commandState.commandId, commandState.label);
-      button.title = `Review Site Plan ${reviewPlanId} through the guarded HQ6 endpoint. No territory, route, resource, reward, Surveyor creation in browser, Atlas execution, or external effect.`;
+      button.title = `Review map plan ${reviewPlanId} through the guarded HQ6 endpoint. No territory, route, resource, reward, Surveyor creation in browser, Atlas execution, or external effect.`;
       button.setAttribute('aria-label', button.title);
       button.addEventListener('click', () => doReviewSitePlan(reviewPlanId));
       rail.appendChild(button);
@@ -2724,6 +2759,7 @@
       button.dataset.serverMutationImplemented = 'true';
       button.dataset.routeAuthority = 'false';
       button.dataset.resourceDelta = '{}';
+      button.dataset.mapNativeVerb = 'Convoy';
       button.disabled = pendingConvoyPlan;
       button.textContent = pendingConvoyPlan ? '...' : expeditionGuidedCommandLabel(commandState.commandId, commandState.label);
       button.title = `Prepare Convoy from reviewed Site Plan ${reviewPlanId} through the guarded convoy endpoint.`;
@@ -3784,7 +3820,8 @@
       renderer.disposeExpeditionMap(previousThreeHost);
     }
     body.innerHTML = '';
-    body.classList.add('fp-expedition-map-body', 'fp-expedition-map-body--map-first');
+    body.classList.add('fp-expedition-map-body', 'fp-expedition-map-body--map-first', 'fp-expedition-map-body--hq17b-option1');
+    body.closest('.fp-expedition-map-panel')?.classList.add('fp-expedition-map-panel--hq17b-option1');
 
     if (!hasExpeditionMapReadModel(model, bundle)) {
       body.innerHTML = '<p class="fp-helper">Expedition Map fog state is not exposed by the server read model yet.</p>';
@@ -3811,22 +3848,24 @@
     runtimeShell.className = 'fp-expedition-map-runtime';
     runtimeShell.dataset.testid = 'fp-expedition-map-runtime';
     const hud = document.createElement('aside');
-    hud.className = 'fp-expedition-map-hud fp-expedition-inspector-drawer';
+    hud.className = 'fp-expedition-map-hud fp-expedition-inspector-drawer fp-expedition-ledger-rail';
     hud.dataset.testid = 'fp-expedition-map-hud';
     hud.dataset.drawer = 'visual-inspector';
     hud.dataset.readOnly = 'true';
     hud.dataset.actions = '0';
+    hud.dataset.hudInstrument = 'collapsed-ledger';
     runtimeShell.appendChild(hud);
     body.appendChild(runtimeShell);
     appendExpeditionInspectorChrome(hud, model, selectedCell, counts);
 
     const statusCard = document.createElement('article');
-    statusCard.className = `fp-expedition-map-card${model.status === 'FOG_READ_MODEL_READY' ? ' fp-expedition-map-card--ready' : ''}`;
+    statusCard.className = `fp-expedition-map-card fp-expedition-hud-crest${model.status === 'FOG_READ_MODEL_READY' ? ' fp-expedition-map-card--ready' : ''}`;
     statusCard.dataset.testid = 'fp-expedition-map-status';
     statusCard.dataset.status = String(model.status || '');
     statusCard.dataset.readOnly = model.readOnly ? 'true' : 'false';
     statusCard.dataset.revealed = String(revealedCells.length);
     statusCard.dataset.hidden = String(hiddenCells.length);
+    statusCard.dataset.hudInstrument = 'crest-status';
     statusCard.title = `${status}; ${countLabel(revealedCells.length, 'revealed sector')} and ${countLabel(hiddenCells.length, 'hidden silhouette')} from server-owned fog state.`;
     statusCard.setAttribute('aria-label', statusCard.title);
     const title = document.createElement('strong');
@@ -3870,14 +3909,12 @@
       statusLedger.dataset.readOnly = 'true';
       statusLedger.dataset.actions = '0';
     }
-    hud.appendChild(statusCard);
-    appendExpeditionObjectiveStrip(hud, objective, guidedLoop, surveyBridge);
-    appendExpeditionLocationVisitSurface(hud, selectedCell, model);
     const inspector = hud;
 
     const boardCard = document.createElement('article');
     boardCard.className = 'fp-expedition-map-card fp-expedition-map-card--board';
     boardCard.dataset.testid = 'fp-expedition-map-board-card';
+    boardCard.dataset.hudComposition = 'hq17b_option1_runtime';
     const boardTitle = document.createElement('strong');
     boardTitle.textContent = '◎';
     boardTitle.title = 'Zoomable sectors';
@@ -3917,6 +3954,14 @@
     boardCopy.hidden = true;
     boardCopy.title = boardCopy.textContent;
     boardCard.appendChild(boardCopy);
+    boardCard.appendChild(statusCard);
+    const objectiveStrip = appendExpeditionObjectiveStrip(boardCard, objective, guidedLoop, surveyBridge);
+    if (objectiveStrip) {
+      objectiveStrip.classList.add('fp-expedition-hud-objective');
+      objectiveStrip.dataset.hudInstrument = 'objective-loop';
+    }
+    const visitSurface = appendExpeditionLocationVisitSurface(boardCard, selectedCell, model);
+    if (visitSurface) visitSurface.dataset.hudInstrument = 'site-context';
     appendExpeditionMapVisualHud(boardCard, model, counts, selectedCell, scoutableCells, bundle);
     appendExpeditionUnitRoster(boardCard, model, selectedCell);
     runtimeShell.insertBefore(boardCard, hud);

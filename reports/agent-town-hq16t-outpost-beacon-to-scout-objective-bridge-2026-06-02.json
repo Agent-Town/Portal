@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "generatedAt": "2026-06-02T13:05:37.120Z",
+  "generatedAt": "2026-06-03T03:18:38.468Z",
   "title": "HQ16T Outpost Beacon to Scout Objective Bridge",
   "source": "FP-E2E-022Q mocked server-owned owned_outpost cell, outpost_crew unit, and hinted frontier_hint read-model cell",
   "screenshots": [
@@ -14,9 +14,10 @@
       "nextCellId": "cell_q1_r1",
       "bridgeTargetCellId": "cell_q1_r1",
       "bridgeCommandId": "scout_sector",
+      "mapNativeCue": "next_scout",
       "bridgeReadOnly": "true",
       "bridgeActions": 0,
-      "text": "⌂ Set\n● Q0 R1\n◇ Q1 R1\n0 ✦\nDETAILS"
+      "text": "⌂ Set\n● Q0 R1\n◇ Q1 R1\n0 ✦\n⌖\nNext Scout\nQ1 R1\nDETAILS"
     },
     "nextFrontierChip": {
       "cellId": "cell_q1_r1",
@@ -24,6 +25,16 @@
       "readOnly": "true",
       "actions": 0,
       "label": "◇ Q1 R1"
+    },
+    "nextScoutCue": {
+      "present": true,
+      "commandId": "scout_sector",
+      "cellId": "cell_q1_r1",
+      "visualOnly": "true",
+      "readOnly": "true",
+      "actions": 0,
+      "routeAuthority": "false",
+      "text": "⌖\nNext Scout\nQ1 R1"
     },
     "objective": {
       "mode": "scout",
@@ -144,6 +155,8 @@
         {
           "unitId": "expedition_unit_outpost_crew_claim_hq16q_ridge",
           "unitType": "outpost_crew",
+          "commandId": "scout_sector",
+          "cueLabel": "Next Scout",
           "originCellId": "cell_q0_r1",
           "targetCellId": "cell_q1_r1",
           "targetFogState": "hinted",
@@ -208,6 +221,7 @@
     "bridgeTargetSelectedByExistingObjectiveMarker": true,
     "scoutSectorAffordanceExistingAndGuarded": true,
     "outpostStatusReadOnly": true,
+    "mapNativeNextScoutCue": true,
     "objectiveReadOnly": true,
     "noOutpostCommandsCreated": true,
     "beaconVisualOnly": true,

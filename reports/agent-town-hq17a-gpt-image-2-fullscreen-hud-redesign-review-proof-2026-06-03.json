@@ -1,0 +1,68 @@
+{
+  "ok": true,
+  "generatedAt": "2026-06-03T03:30:00+07:00",
+  "title": "HQ17A GPT Image 2 fullscreen HUD redesign review",
+  "model": "openai/gpt-image-2",
+  "verdict": "REVIEW_MEDIA_READY_RUNTIME_PROMOTION_HELD",
+  "sourceTaskId": "b786e262-1f46-4d29-8870-2f87a5a2ce92",
+  "reviewOnly": true,
+  "runtimePromotion": false,
+  "domCssBinding": false,
+  "serverAuthorityChanged": false,
+  "atlasExecution": false,
+  "generatedUniverseRuntimeExpansion": false,
+  "externalEffects": false,
+  "promptIntent": {
+    "fullscreenGameHud": true,
+    "mapDominant": true,
+    "avoidGiantBlankCards": true,
+    "avoidDebugTextPanels": true,
+    "compactHudInstruments": true,
+    "frontierTownFlavor": true,
+    "humanPlusAgentTokens": true,
+    "noReadableParagraphsRequested": true
+  },
+  "artifacts": {
+    "contactSheet": {
+      "path": "reports/agent-town-hq17a-gpt-image-2-fullscreen-hud-redesign-review-contact-sheet-2026-06-03.png",
+      "width": 960,
+      "height": 1674,
+      "sha256": "067fd0d6c64de07ae9ccef6fff1196df58ed67dc3db9124ab7f4d36f81b7debc"
+    },
+    "concepts": [
+      {
+        "slot": "concept-01",
+        "path": "reports/media/agent-town-hq17a-gpt-image-2-fullscreen-hud-redesign-review-2026-06-03/agent-town-hq17a-fullscreen-hud-redesign-concept-01-2026-06-03.png",
+        "width": 2048,
+        "height": 1152,
+        "sha256": "a3fb4f67e3b1a005e2cdbd37414064211c3ac9be2ed61977483cad4f9f2047bd",
+        "parentReview": "strongest immediate runtime HUD direction"
+      },
+      {
+        "slot": "concept-02",
+        "path": "reports/media/agent-town-hq17a-gpt-image-2-fullscreen-hud-redesign-review-2026-06-03/agent-town-hq17a-fullscreen-hud-redesign-concept-02-2026-06-03.png",
+        "width": 2048,
+        "height": 1152,
+        "sha256": "f65f12e97df5777479ff0e8f2b37a0ced594a5ce60fa48cb6e1d1227c95ad27d",
+        "parentReview": "strongest strategic-map layout"
+      },
+      {
+        "slot": "concept-03",
+        "path": "reports/media/agent-town-hq17a-gpt-image-2-fullscreen-hud-redesign-review-2026-06-03/agent-town-hq17a-fullscreen-hud-redesign-concept-03-2026-06-03.png",
+        "width": 2048,
+        "height": 1152,
+        "sha256": "3faf12b89ae98237d3809d89f81ee74697585d1a70aa54ddca6a2d79e88a1af0",
+        "parentReview": "strongest frontier-town flavor and visible play loop"
+      }
+    ]
+  },
+  "guardrails": {
+    "noRuntimeSourceEdits": true,
+    "noServerRouteToolSchemaPackageEdits": true,
+    "noRuntimeAssetPromotion": true,
+    "noGameplayAuthorityChange": true,
+    "noHiddenTruthLeakage": true,
+    "noMovementFogRouteTradeEconomyRewardCombatSchedulerExpansion": true,
+    "noPushMergeDeployPublicShare": true
+  }
+}

@@ -218,10 +218,17 @@ test('FP-E2E-022Q selected outpost crew shows read-only outpost status surface',
   await expect(page.getByTestId('fp-expedition-outpost-status')).toHaveAttribute('data-bridge-command-id', 'scout_sector');
   await expect(page.getByTestId('fp-expedition-outpost-status')).toHaveAttribute('data-bridge-read-only', 'true');
   await expect(page.getByTestId('fp-expedition-outpost-status')).toHaveAttribute('data-bridge-actions', '0');
+  await expect(page.getByTestId('fp-expedition-outpost-status')).toHaveAttribute('data-map-native-cue', 'next_scout');
   await expect(page.getByTestId('fp-expedition-outpost-next-frontier')).toHaveAttribute('data-cell-id', 'cell_q1_r1');
   await expect(page.getByTestId('fp-expedition-outpost-next-frontier')).toHaveAttribute('data-command-id', 'scout_sector');
   await expect(page.getByTestId('fp-expedition-outpost-next-frontier')).toHaveAttribute('data-read-only', 'true');
   await expect(page.getByTestId('fp-expedition-outpost-next-frontier')).toHaveAttribute('data-actions', '0');
+  await expect(page.getByTestId('fp-expedition-outpost-next-scout-cue')).toHaveAttribute('data-command-id', 'scout_sector');
+  await expect(page.getByTestId('fp-expedition-outpost-next-scout-cue')).toHaveAttribute('data-cell-id', 'cell_q1_r1');
+  await expect(page.getByTestId('fp-expedition-outpost-next-scout-cue')).toHaveAttribute('data-visual-only', 'true');
+  await expect(page.getByTestId('fp-expedition-outpost-next-scout-cue')).toHaveAttribute('data-read-only', 'true');
+  await expect(page.getByTestId('fp-expedition-outpost-next-scout-cue')).toHaveAttribute('data-actions', '0');
+  await expect(page.getByTestId('fp-expedition-outpost-next-scout-cue')).toContainText('Next Scout');
   await expect(page.getByTestId('fp-expedition-outpost-status')).toContainText('⌂ Set');
   await expect(page.getByTestId('fp-expedition-outpost-status')).toContainText('◇ Q1 R1');
   await expect(page.getByTestId('fp-expedition-outpost-status-details')).not.toHaveAttribute('open', '');
@@ -283,6 +290,7 @@ test('FP-E2E-022Q selected outpost crew shows read-only outpost status surface',
     const surface = document.querySelector('[data-testid="fp-expedition-outpost-status"]');
     const details = document.querySelector('[data-testid="fp-expedition-outpost-status-details"]');
     const commandBar = document.querySelector('[data-testid="fp-expedition-unit-command-bar"]');
+    const nextScoutCue = document.querySelector('[data-testid="fp-expedition-outpost-next-scout-cue"]');
     const clipped = Array.from(document.querySelectorAll('[data-testid="fp-expedition-outpost-status"], [data-testid="fp-expedition-unit-roster"], [data-testid="fp-expedition-unit-command-bar"]'))
       .filter((node) => node.scrollWidth > node.clientWidth + 1)
       .map((node) => node.getAttribute('data-testid') || node.className || node.tagName);
@@ -297,7 +305,18 @@ test('FP-E2E-022Q selected outpost crew shows read-only outpost status surface',
         foundedPlotId: surface?.getAttribute('data-founded-plot-id') || '',
         readOnly: surface?.getAttribute('data-read-only') || '',
         actions: surface?.getAttribute('data-actions') || '',
+        mapNativeCue: surface?.getAttribute('data-map-native-cue') || '',
         text: surface?.innerText || '',
+      },
+      nextScoutCue: {
+        present: !!nextScoutCue,
+        commandId: nextScoutCue?.getAttribute('data-command-id') || '',
+        cellId: nextScoutCue?.getAttribute('data-cell-id') || '',
+        visualOnly: nextScoutCue?.getAttribute('data-visual-only') || '',
+        readOnly: nextScoutCue?.getAttribute('data-read-only') || '',
+        actions: Number(nextScoutCue?.getAttribute('data-actions') || 0),
+        routeAuthority: nextScoutCue?.getAttribute('data-route-authority') || '',
+        text: nextScoutCue?.innerText || '',
       },
       details: {
         present: !!details,
@@ -360,6 +379,13 @@ test('FP-E2E-022Q selected outpost crew shows read-only outpost status surface',
       detailsDrawerAvailable: proof.details.present === true,
       detailsDrawerCollapsedByDefault: proof.details.open === false,
       noClientOutpostAuthority: proof.outpostStatus.readOnly === 'true' && proof.outpostStatus.actions === '0',
+      mapNativeNextScoutCue: proof.outpostStatus.mapNativeCue === 'next_scout'
+        && proof.nextScoutCue.present === true
+        && proof.nextScoutCue.commandId === 'scout_sector'
+        && proof.nextScoutCue.cellId === 'cell_q1_r1'
+        && proof.nextScoutCue.visualOnly === 'true'
+        && proof.nextScoutCue.readOnly === 'true'
+        && proof.nextScoutCue.actions === 0,
       primarySurfacePaperworkHidden: Object.values(proof.primaryText).every((text) => !primaryPaperworkPattern.test(text)),
       rendererCreatedNoActions: proof.renderer.visualLayers.clientAuthority === false,
       unitTokensReadOnly: proof.renderer.visualLayers.unitTokensReadOnly === true,
@@ -462,6 +488,7 @@ test('FP-E2E-022Q selected outpost crew shows read-only outpost status surface',
     const renderer = window.__foundersPlotTest.getExpeditionMapInfo();
     const outpost = document.querySelector('[data-testid="fp-expedition-outpost-status"]');
     const next = document.querySelector('[data-testid="fp-expedition-outpost-next-frontier"]');
+    const nextScoutCue = document.querySelector('[data-testid="fp-expedition-outpost-next-scout-cue"]');
     const objective = document.querySelector('[data-testid="fp-expedition-objective-strip"]');
     const selectedSummary = document.querySelector('[data-testid="fp-expedition-map-selected-summary"]');
     const scoutAlias = document.querySelector('[data-testid="fp-btn-scout-sector-cell_q1_r1"]');
@@ -476,6 +503,7 @@ test('FP-E2E-022Q selected outpost crew shows read-only outpost status surface',
         nextCellId: outpost?.getAttribute('data-next-cell-id') || '',
         bridgeTargetCellId: outpost?.getAttribute('data-bridge-target-cell-id') || '',
         bridgeCommandId: outpost?.getAttribute('data-bridge-command-id') || '',
+        mapNativeCue: outpost?.getAttribute('data-map-native-cue') || '',
         bridgeReadOnly: outpost?.getAttribute('data-bridge-read-only') || '',
         bridgeActions: Number(outpost?.getAttribute('data-bridge-actions') || 0),
         text: outpost?.innerText || '',
@@ -486,6 +514,16 @@ test('FP-E2E-022Q selected outpost crew shows read-only outpost status surface',
         readOnly: next?.getAttribute('data-read-only') || '',
         actions: Number(next?.getAttribute('data-actions') || 0),
         label: next?.textContent || '',
+      },
+      nextScoutCue: {
+        present: !!nextScoutCue,
+        commandId: nextScoutCue?.getAttribute('data-command-id') || '',
+        cellId: nextScoutCue?.getAttribute('data-cell-id') || '',
+        visualOnly: nextScoutCue?.getAttribute('data-visual-only') || '',
+        readOnly: nextScoutCue?.getAttribute('data-read-only') || '',
+        actions: Number(nextScoutCue?.getAttribute('data-actions') || 0),
+        routeAuthority: nextScoutCue?.getAttribute('data-route-authority') || '',
+        text: nextScoutCue?.innerText || '',
       },
       objective: {
         mode: objective?.getAttribute('data-mode') || '',
@@ -527,7 +565,12 @@ test('FP-E2E-022Q selected outpost crew shows read-only outpost status surface',
   }, { outpostUnitId, cellId });
 
   expect(bridgeProof.outpost.cellId).toBe(cellId);
+  expect(bridgeProof.outpost.mapNativeCue).toBe('next_scout');
   expect(bridgeProof.outpost.bridgeTargetCellId).toBe('cell_q1_r1');
+  expect(bridgeProof.nextScoutCue.present).toBe(true);
+  expect(bridgeProof.nextScoutCue.commandId).toBe('scout_sector');
+  expect(bridgeProof.nextScoutCue.visualOnly).toBe('true');
+  expect(bridgeProof.nextScoutCue.actions).toBe(0);
   expect(bridgeProof.nextFrontierChip.cellId).toBe('cell_q1_r1');
   expect(bridgeProof.objective.mode).toBe('scout');
   expect(bridgeProof.objective.targetCellId).toBe('cell_q1_r1');
@@ -562,6 +605,13 @@ test('FP-E2E-022Q selected outpost crew shows read-only outpost status surface',
       bridgeTargetSelectedByExistingObjectiveMarker: bridgeProof.selectedSummary.cellId === bridgeProof.outpost.bridgeTargetCellId && bridgeProof.selectedSummary.scoutable === 'true',
       scoutSectorAffordanceExistingAndGuarded: bridgeProof.scoutAlias.present === true && bridgeProof.scoutAlias.cellId === bridgeProof.outpost.bridgeTargetCellId,
       outpostStatusReadOnly: bridgeProof.outpost.bridgeReadOnly === 'true' && bridgeProof.outpost.bridgeActions === 0,
+      mapNativeNextScoutCue: bridgeProof.outpost.mapNativeCue === 'next_scout'
+        && bridgeProof.nextScoutCue.present === true
+        && bridgeProof.nextScoutCue.commandId === 'scout_sector'
+        && bridgeProof.nextScoutCue.cellId === bridgeProof.outpost.bridgeTargetCellId
+        && bridgeProof.nextScoutCue.visualOnly === 'true'
+        && bridgeProof.nextScoutCue.readOnly === 'true'
+        && bridgeProof.nextScoutCue.actions === 0,
       objectiveReadOnly: bridgeProof.objective.readOnly === 'true' && bridgeProof.objective.actions === 0 && bridgeProof.objective.buttons === 0,
       noOutpostCommandsCreated: bridgeProof.commandBar.actions === 0 && bridgeProof.renderer.commandTargets.length === 0,
       beaconVisualOnly: bridgeProof.renderer.visualLayers.outpostNextFrontierBeaconVisualOnly === true,

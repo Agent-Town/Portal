@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "generatedAt": "2026-06-02T11:02:53.088Z",
+  "generatedAt": "2026-06-03T03:18:26.227Z",
   "title": "HQ16L reviewed Site Plan to Surveyor Prepare Convoy map bridge",
   "source": "FP-E2E-022L mocked server-owned HQ16K/HQ16L expeditionMap.surveyBridge read model",
   "screenshots": [
@@ -11,13 +11,13 @@
     "plotId": "plot_hq16l_review_to_convoy_bridge",
     "sitePlanId": "site_plan_hq16l_packet_ridge",
     "actor": "HUMAN",
-    "idempotencyKey": "fp-prepare-settler-convoy-site_plan_hq16l_packet_ridge-mpwj3jek-1"
+    "idempotencyKey": "fp-prepare-settler-convoy-site_plan_hq16l_packet_ridge-mpxhy44q-1"
   },
   "proof": {
     "objective": {
       "mode": "convoy",
       "targetCellId": "cell_q0_r1",
-      "text": "FOCUSCNVPLANQ0 R1SVYReadyCMDConvoyACT1OBJ▣CNVQ0 R1CMD▣ConvoySVY · Q0 R1RES▣ReadyKNOWNRCP⚿PacketQ0 R1NXT▣ConvoyQ0 R1 · KNOWNPKTPacketQ0 R1SVYPlanReadyCMDConvoyEndpointConvoyReceiptsQ0 R1 has a reviewed Site Plan and Surveyor command target. Prepare Convoy uses the existing guarded endpoint.Read-only marker. No new server objectives, hidden truth, or actions.Ledger detail: guided loop rows are derived from existing Expedition Map cells, unit command hints, event packets, and the latest local server result. They do not create commands, costs, rewards, routes, hidden truth, Atlas execution, or external effects. Reviewed packet-derived Site Plan exposes only the existing Prepare Convoy endpoint; the browser does not create Surveyors or new authority.",
+      "text": "⌾▣◎◎◉✓✦▣✦1◎▣▣Q0 R1✦▣ConvoySVY · Q0 R1✓▣Ready●⚿⚿MarkerQ0 R1➜▣ConvoyQ0 R1 · ●⚑ScoutQ0 R1▧SiteReady✦ConvoyGoConvoyDetailsQ0 R1 is surveyed and ready. Use Convoy from the map target.Read-only marker. No new server objectives, hidden truth, or actions.Debug detail: guided loop rows are derived from existing Expedition Map cells, unit command hints, map markers, and the latest local server result. They do not create commands, costs, rewards, routes, hidden truth, Atlas execution, or external effects. Reviewed packet-derived Site Plan exposes only the existing Prepare Convoy endpoint; the browser does not create Surveyors or new authority.",
       "buttons": 1
     },
     "bridge": {
@@ -25,6 +25,7 @@
       "actions": 1,
       "commandId": "prepare_settler_convoy",
       "actionName": "et.plot.prepare_settler_convoy",
+      "mapNativeVerb": "Convoy",
       "readOnly": "true",
       "buttons": 1
     },
@@ -35,7 +36,7 @@
     },
     "commandBar": {
       "unitId": "expedition_unit_surveyor_site_plan_hq16l_packet_ridge",
-      "text": "⌗ SVYConvoyPLAN0 ↦WAIT"
+      "text": "⌗ ▧▣▧0 ↦⏳"
     },
     "renderer": {
       "commandTargets": [
@@ -123,6 +124,13 @@
         "eventObjectiveMarkersReadOnly": true,
         "eventObjectiveMarkersInspectable": true,
         "eventObjectiveMarkerAuthority": false,
+        "outpostNextFrontierBeacon": true,
+        "outpostNextFrontierBeaconCount": 0,
+        "outpostNextFrontierBeaconVisualOnly": true,
+        "outpostNextFrontierBeaconReadOnly": true,
+        "outpostNextFrontierBeaconSelectable": false,
+        "outpostNextFrontierBeaconAuthority": false,
+        "outpostNextFrontierBeaconHiddenTruthLeakage": false,
         "unitTokens": true,
         "unitTokenCount": 1,
         "unitTokensReadOnly": true,
@@ -159,6 +167,7 @@
     "prepareEndpointUsed": true,
     "objectiveIsConvoyBridge": true,
     "bridgeUsesExistingPrepareEndpoint": true,
+    "mapNativeConvoyVerb": true,
     "commandTargetPreviewOnly": true,
     "routeAuthority": false,
     "resourceHarvesting": false,

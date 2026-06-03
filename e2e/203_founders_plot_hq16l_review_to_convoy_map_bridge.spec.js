@@ -342,6 +342,7 @@ test('FP-E2E-022L reviewed packet Site Plan points Surveyor to Prepare Convoy on
   await expect(page.getByTestId('fp-expedition-survey-bridge')).toHaveAttribute('data-status', 'SURVEYOR_COMMAND_READY');
   await expect(page.getByTestId('fp-expedition-survey-bridge')).toHaveAttribute('data-actions', '1');
   await expect(page.getByTestId('fp-expedition-survey-bridge')).toHaveAttribute('data-command-id', 'prepare_settler_convoy');
+  await expect(page.getByTestId('fp-expedition-survey-bridge')).toHaveAttribute('data-map-native-verb', 'Convoy');
   await expect(page.getByTestId(`fp-expedition-survey-bridge-btn-prepare-settler-convoy-${planId}`)).toHaveAttribute('data-action-name', 'et.plot.prepare_settler_convoy');
   await expect(page.getByTestId(`fp-expedition-unit-token-${surveyorUnitId}`)).toHaveAttribute('data-cell-id', cellId);
 
@@ -404,6 +405,7 @@ test('FP-E2E-022L reviewed packet Site Plan points Surveyor to Prepare Convoy on
         actions: Number(bridge?.getAttribute('data-actions') || 0),
         commandId: bridge?.getAttribute('data-command-id') || '',
         actionName: bridge?.getAttribute('data-action-name') || '',
+        mapNativeVerb: bridge?.getAttribute('data-map-native-verb') || '',
         readOnly: bridge?.getAttribute('data-read-only') || '',
         buttons: bridge ? bridge.querySelectorAll('button').length : 0,
       },
@@ -447,6 +449,7 @@ test('FP-E2E-022L reviewed packet Site Plan points Surveyor to Prepare Convoy on
       prepareEndpointUsed: capturedPrepare?.sitePlanId === planId,
       objectiveIsConvoyBridge: proof.objective.mode === 'convoy' && proof.objective.targetCellId === cellId,
       bridgeUsesExistingPrepareEndpoint: proof.bridge.commandId === 'prepare_settler_convoy' && proof.bridge.actionName === 'et.plot.prepare_settler_convoy',
+      mapNativeConvoyVerb: proof.bridge.mapNativeVerb === 'Convoy',
       commandTargetPreviewOnly: proof.renderer.commandTargets.every((target) => target.previewOnly === true && target.visualOnly === true && target.readOnly === true),
       routeAuthority: false,
       resourceHarvesting: false,

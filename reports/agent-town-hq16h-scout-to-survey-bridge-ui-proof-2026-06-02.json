@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "generatedAt": "2026-06-02T08:23:08.792Z",
+  "generatedAt": "2026-06-03T03:18:08.593Z",
   "title": "HQ16H Scout Packet to Site Plan bridge UI",
   "source": "FP-E2E-022H mocked server-owned expeditionMap.surveyBridge read model",
   "screenshots": [
@@ -10,18 +10,19 @@
   "proof": {
     "bridge": {
       "visible": true,
-      "text": "PKTPacketQ0 R1SVYSite planPreflightCMDWaitContract",
-      "label": "Scout Packet to Site Plan bridge: Preflight at cell_q0_r1. Read-only; zero executable actions.",
+      "text": "⚑ScoutQ0 R1▧PlanPlan✦WaitWait",
+      "label": "Map bridge: Plan at cell_q0_r1. Read-only; zero executable actions.",
       "readOnly": "true",
       "actions": 0,
       "status": "PACKET_READY_FOR_SITE_PLAN_PREFLIGHT",
+      "mapNativeVerb": "Plan",
       "serverMutationImplemented": "false",
       "packetId": "expedition_event_packet_hq16h_cell_q0_r1",
       "cellId": "cell_q0_r1",
       "buttons": 0,
       "rect": {
         "x": 54,
-        "y": 225,
+        "y": 228,
         "width": 294,
         "height": 46
       },
@@ -33,7 +34,7 @@
       "steps": [
         {
           "testid": "fp-expedition-survey-bridge-step-packet",
-          "text": "PKTPacketQ0 R1",
+          "text": "⚑ScoutQ0 R1",
           "readOnly": "true",
           "actions": 0,
           "cellId": "cell_q0_r1",
@@ -41,7 +42,7 @@
         },
         {
           "testid": "fp-expedition-survey-bridge-step-site-plan",
-          "text": "SVYSite planPreflight",
+          "text": "▧PlanPlan",
           "readOnly": "true",
           "actions": 0,
           "cellId": "cell_q0_r1",
@@ -49,7 +50,7 @@
         },
         {
           "testid": "fp-expedition-survey-bridge-step-command",
-          "text": "CMDWaitContract",
+          "text": "✦WaitWait",
           "readOnly": "true",
           "actions": 0,
           "cellId": "cell_q0_r1",
@@ -59,11 +60,12 @@
     },
     "mapBridge": {
       "visible": true,
-      "text": "PKTPacketQ0 R1SVYSite planPreflightCMDWaitContract",
-      "label": "Scout Packet to Site Plan bridge: Preflight at cell_q0_r1. Read-only; zero executable actions.",
+      "text": "⚑ScoutQ0 R1▧PlanPlan✦WaitWait",
+      "label": "Map bridge: Plan at cell_q0_r1. Read-only; zero executable actions.",
       "readOnly": "true",
       "actions": 0,
       "status": "PACKET_READY_FOR_SITE_PLAN_PREFLIGHT",
+      "mapNativeVerb": "Plan",
       "serverMutationImplemented": "false",
       "packetId": "expedition_event_packet_hq16h_cell_q0_r1",
       "cellId": "cell_q0_r1",
@@ -77,12 +79,12 @@
       "elementAtCenter": {
         "testid": "",
         "className": "",
-        "text": "Site plan"
+        "text": "Plan"
       },
       "steps": [
         {
           "testid": "fp-expedition-survey-bridge-map-selected-step-packet",
-          "text": "PKTPacketQ0 R1",
+          "text": "⚑ScoutQ0 R1",
           "readOnly": "true",
           "actions": 0,
           "cellId": "cell_q0_r1",
@@ -90,7 +92,7 @@
         },
         {
           "testid": "fp-expedition-survey-bridge-map-selected-step-site-plan",
-          "text": "SVYSite planPreflight",
+          "text": "▧PlanPlan",
           "readOnly": "true",
           "actions": 0,
           "cellId": "cell_q0_r1",
@@ -98,7 +100,7 @@
         },
         {
           "testid": "fp-expedition-survey-bridge-map-selected-step-command",
-          "text": "CMDWaitContract",
+          "text": "✦WaitWait",
           "readOnly": "true",
           "actions": 0,
           "cellId": "cell_q0_r1",
@@ -126,6 +128,7 @@
     "objectiveButtons": 0,
     "bridgeReadOnly": true,
     "bridgeActions": 0,
+    "mapNativePlanVerb": true,
     "stepActions": 0,
     "surveyCommandFabricatedInFrontend": false,
     "serverMutationImplemented": false,
