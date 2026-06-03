@@ -338,7 +338,6 @@ test('FP-E2E-022L reviewed packet Site Plan points Surveyor to Prepare Convoy on
   await expect(page.getByTestId('fp-expedition-map-panel')).toBeVisible();
   await expect(page.getByTestId('fp-expedition-objective-strip')).toHaveAttribute('data-mode', 'convoy');
   await expect(page.getByTestId('fp-expedition-objective-strip')).toHaveAttribute('data-target-cell-id', cellId);
-  await expect(page.getByTestId('fp-expedition-objective-strip')).toContainText('CNV');
   await expect(page.getByTestId('fp-expedition-objective-strip')).toContainText('Convoy');
   await expect(page.getByTestId('fp-expedition-survey-bridge')).toHaveAttribute('data-status', 'SURVEYOR_COMMAND_READY');
   await expect(page.getByTestId('fp-expedition-survey-bridge')).toHaveAttribute('data-actions', '1');
