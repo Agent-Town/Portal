@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "generatedAt": "2026-06-03T05:15:05.535Z",
+  "generatedAt": "2026-06-03T11:37:01.528Z",
   "title": "HQ17B Option 1 runtime HUD visual proof",
   "source": "FP-E2E-022B1 continuous guarded endpoint replay with HQ17B DOM/CSS HUD slot assertions.",
   "branch": "neo/progression-atlas-editor-next-2026-05-29",
@@ -12,7 +12,7 @@
     "firstScout": {
       "endpointUsed": "et.plot.scout_sector",
       "revealedCellId": "cell_q1_r0",
-      "packetId": "expedition_event_packet_fb575b4ee640ead4",
+      "packetId": "expedition_event_packet_8db83568249b33f5",
       "boundaryFlags": {
         "samePlotOnly": true,
         "serverOwnedDiscoveryReceipt": true,
@@ -33,8 +33,8 @@
     },
     "packetPlan": {
       "endpointUsed": "et.plot.draft_site_plan_from_packet",
-      "planId": "site_plan_expedition_event_packet_fb575b4ee640ead4",
-      "packetId": "expedition_event_packet_fb575b4ee640ead4",
+      "planId": "site_plan_expedition_event_packet_8db83568249b33f5",
+      "packetId": "expedition_event_packet_8db83568249b33f5",
       "boundaryFlags": {
         "samePlotOnly": true,
         "createsSitePlan": true,
@@ -62,18 +62,18 @@
     },
     "review": {
       "endpointUsed": "et.plot.review_site_plan",
-      "planId": "site_plan_expedition_event_packet_fb575b4ee640ead4",
+      "planId": "site_plan_expedition_event_packet_8db83568249b33f5",
       "reviewStatus": "reviewed"
     },
     "prepareConvoy": {
       "endpointUsed": "et.plot.prepare_settler_convoy",
-      "claimId": "claim_aa74dec9a9cb8d3b",
+      "claimId": "claim_f2acc03eccc983df",
       "status": "CONVOY_PREPARING"
     },
     "foundOutpost": {
       "endpointUsed": "et.plot.found_settlement",
-      "claimId": "claim_aa74dec9a9cb8d3b",
-      "foundedPlotId": "plot_255171e272830227"
+      "claimId": "claim_f2acc03eccc983df",
+      "foundedPlotId": "plot_cf6a2552e6a6669d"
     }
   },
   "hudProof": {
@@ -104,13 +104,17 @@
         "fp-panel__body",
         "fp-expedition-map-body",
         "fp-expedition-map-body--map-first",
-        "fp-expedition-map-body--hq17b-option1"
+        "fp-expedition-map-body--hq17b-option1",
+        "fp-expedition-map-body--hq17c-generated-chrome",
+        "fp-expedition-map-body--hq17d-three-masks"
       ],
       "panelClasses": [
         "fp-parchment",
         "fp-panel",
         "fp-expedition-map-panel",
-        "fp-expedition-map-panel--hq17b-option1"
+        "fp-expedition-map-panel--hq17b-option1",
+        "fp-expedition-map-panel--hq17c-generated-chrome",
+        "fp-expedition-map-panel--hq17d-three-masks"
       ],
       "board": {
         "present": true,
@@ -128,7 +132,7 @@
         "actions": 0,
         "readOnly": "",
         "text": "Survey R1 H9 Q1 R0 · ◇ + - 0 ◎ ◎ ◆1 □9 LEDGER / FOG ⌾ ⌖ ⌖ 1 ◆ 1 □ 9 ◉ 3 ◎ ⌖ ⌖ Q1 R0 ✦ ⌖ Scout SCT · Q1 R0 ✓ ⌖ Ready ◇ ⚿ ⚿ Map Q1 R0 ➜ ⌖ Scout Q1 R0 · ◇ DETAILS ◆ 1 ● 0 ◇ 1 □ 8 ◇ ◇ ◇ ◇ ⌖ 1 ⚿ 3 ◉ 1 ⚿ MT RS VD ◉ 3 ◉ 1 ✦ ⌖ ⌖ ◆ 1 ⚑ ✉ ◆ 0 ◈ ◉ ◆ 0 ⌖ ⌖ ↦ ⌖ ⌖ ◇ 0 ↦ ↦",
-        "composition": "hq17b_option1_runtime"
+        "composition": "hq17c_generated_chrome_runtime"
       },
       "slots": {
         "crestStatus": {
@@ -137,10 +141,10 @@
           "rect": {
             "x": 102,
             "y": 136,
-            "width": 276,
-            "height": 52,
-            "right": 378,
-            "bottom": 188
+            "width": 402,
+            "height": 88,
+            "right": 504,
+            "bottom": 224
           },
           "testid": "fp-expedition-map-status",
           "hudInstrument": "crest-status",
@@ -154,10 +158,10 @@
           "rect": {
             "x": 40,
             "y": 202,
-            "width": 548,
-            "height": 102,
-            "right": 588,
-            "bottom": 304
+            "width": 430,
+            "height": 120,
+            "right": 470,
+            "bottom": 322
           },
           "testid": "fp-expedition-objective-strip",
           "hudInstrument": "objective-loop",
@@ -170,10 +174,10 @@
           "visible": true,
           "rect": {
             "x": 42,
-            "y": 747,
-            "width": 636,
-            "height": 143,
-            "right": 678,
+            "y": 738,
+            "width": 650,
+            "height": 152,
+            "right": 692,
             "bottom": 890
           },
           "testid": "fp-expedition-unit-roster",
@@ -186,12 +190,12 @@
           "present": true,
           "visible": true,
           "rect": {
-            "x": 258,
-            "y": 690,
-            "width": 205,
-            "height": 48,
-            "right": 462,
-            "bottom": 738
+            "x": 255,
+            "y": 672,
+            "width": 225,
+            "height": 56,
+            "right": 479,
+            "bottom": 728
           },
           "testid": "fp-expedition-unit-command-bar",
           "hudInstrument": "command-puck",
@@ -294,13 +298,17 @@
         "fp-panel__body",
         "fp-expedition-map-body",
         "fp-expedition-map-body--map-first",
-        "fp-expedition-map-body--hq17b-option1"
+        "fp-expedition-map-body--hq17b-option1",
+        "fp-expedition-map-body--hq17c-generated-chrome",
+        "fp-expedition-map-body--hq17d-three-masks"
       ],
       "panelClasses": [
         "fp-parchment",
         "fp-panel",
         "fp-expedition-map-panel",
-        "fp-expedition-map-panel--hq17b-option1"
+        "fp-expedition-map-panel--hq17b-option1",
+        "fp-expedition-map-panel--hq17c-generated-chrome",
+        "fp-expedition-map-panel--hq17d-three-masks"
       ],
       "board": {
         "present": true,
@@ -318,7 +326,7 @@
         "actions": 0,
         "readOnly": "",
         "text": "Survey R2 H10 Q1 R0 · ◆ + - 0 ◎ ◎ ◆2 □10 LEDGER / FOG ⌾ ⌖ ⌖ 2 ◆ 2 □ 10 ◉ 3 ◎ ⌖ ⌖ Q1 R-1 ✦ ⌖ Scout SCT · Q1 R-1 ✓ ⌖ Ready ◇ ⚿ ⚿ Marker Q1 R0 ➜ ⌖ Scout Q1 R-1 · ◇ ⚑ Scout Q1 R0 ▧ Site Ready ✦ Wait Wait DETAILS ◆ 2 ● 0 ◇ 2 □ 8 ⌂ ⌂ ◆ ◆ ○ 6 ⚿ 3 ◉ ⚑ Scout Q1 R0 ▧ Site Ready ✦ Wait Wait 6 ⚿ MT RS VD ◉ 5 ◉ 2 ✦ ⌖ ⌖ ◆ 2 ⚑ ✉ ◆ 0 ◈ ◉ ◆ 0 ⌗ ▧ ◆ 0 ⌂ ⌂ ◆ 0 ⌂ ⌂ ◎ 0 ↦ ⏳ ⌂ Set ● Q1 R0 ◇ Q1 R-1 0 ✦ ⌖ Next Scout Q1 R-1",
-        "composition": "hq17b_option1_runtime"
+        "composition": "hq17c_generated_chrome_runtime"
       },
       "slots": {
         "crestStatus": {
@@ -327,10 +335,10 @@
           "rect": {
             "x": 102,
             "y": 130,
-            "width": 276,
-            "height": 52,
-            "right": 378,
-            "bottom": 182
+            "width": 402,
+            "height": 88,
+            "right": 504,
+            "bottom": 218
           },
           "testid": "fp-expedition-map-status",
           "hudInstrument": "crest-status",
@@ -344,10 +352,10 @@
           "rect": {
             "x": 40,
             "y": 196,
-            "width": 548,
-            "height": 152,
-            "right": 588,
-            "bottom": 348
+            "width": 430,
+            "height": 170,
+            "right": 470,
+            "bottom": 366
           },
           "testid": "fp-expedition-objective-strip",
           "hudInstrument": "objective-loop",
@@ -360,10 +368,10 @@
           "visible": true,
           "rect": {
             "x": 42,
-            "y": 685,
-            "width": 636,
-            "height": 199,
-            "right": 678,
+            "y": 697,
+            "width": 650,
+            "height": 187,
+            "right": 692,
             "bottom": 884
           },
           "testid": "fp-expedition-unit-roster",
@@ -376,12 +384,12 @@
           "present": true,
           "visible": true,
           "rect": {
-            "x": 294,
-            "y": 641,
-            "width": 132,
-            "height": 35,
-            "right": 426,
-            "bottom": 676
+            "x": 291,
+            "y": 644,
+            "width": 152,
+            "height": 43,
+            "right": 443,
+            "bottom": 687
           },
           "testid": "fp-expedition-unit-command-bar",
           "hudInstrument": "command-puck",
@@ -430,12 +438,12 @@
           "present": true,
           "visible": true,
           "rect": {
-            "x": 50,
-            "y": 826,
-            "width": 620,
+            "x": 218,
+            "y": 814,
+            "width": 432,
             "height": 50,
-            "right": 670,
-            "bottom": 876
+            "right": 650,
+            "bottom": 864
           },
           "testid": "fp-expedition-outpost-status",
           "hudInstrument": "outpost-context",
@@ -447,12 +455,12 @@
           "present": true,
           "visible": true,
           "rect": {
-            "x": 499,
-            "y": 833,
+            "x": 479,
+            "y": 821,
             "width": 164,
             "height": 36,
-            "right": 663,
-            "bottom": 869
+            "right": 643,
+            "bottom": 857
           },
           "testid": "fp-expedition-outpost-next-scout-cue",
           "hudInstrument": "next-scout-cue",
@@ -512,13 +520,17 @@
         "fp-panel__body",
         "fp-expedition-map-body",
         "fp-expedition-map-body--map-first",
-        "fp-expedition-map-body--hq17b-option1"
+        "fp-expedition-map-body--hq17b-option1",
+        "fp-expedition-map-body--hq17c-generated-chrome",
+        "fp-expedition-map-body--hq17d-three-masks"
       ],
       "panelClasses": [
         "fp-parchment",
         "fp-panel",
         "fp-expedition-map-panel",
-        "fp-expedition-map-panel--hq17b-option1"
+        "fp-expedition-map-panel--hq17b-option1",
+        "fp-expedition-map-panel--hq17c-generated-chrome",
+        "fp-expedition-map-panel--hq17d-three-masks"
       ],
       "board": {
         "present": true,
@@ -536,19 +548,19 @@
         "actions": 0,
         "readOnly": "",
         "text": "+ - 0 ◎ ◎ ◆2 □10 LEDGER / FOG ⌾ ⌖ ⌖ ⌖ ⌖ Scout ⌖ Ready ⚿ Marker ⌖ Scout ⚑ Scout Q1 R0 ▧ Site Ready ✦ Wait Wait DETAILS ◇ ◇ ◇ ◇ ⌖ 1 ⚿ 3 ◉ 1 ⚿ MT RS VD ◉ 5 ◉ 2 ✦ ⌖ ⌖ ◆ 2 ⚑ ✉ ◆ 0 ◈ ◉ ◆ 0 ⌗ ▧ ◆ 0 ⌂ ⌂ ◆ 0 ⌖ ⌖ ↦ ↦ ◆ ⌖ ⌖ ◇ 1 ↦ ↦",
-        "composition": "hq17b_option1_runtime"
+        "composition": "hq17c_generated_chrome_runtime"
       },
       "slots": {
         "crestStatus": {
           "present": true,
           "visible": true,
           "rect": {
-            "x": 78,
+            "x": 70,
             "y": 102,
-            "width": 244,
-            "height": 46,
-            "right": 322,
-            "bottom": 148
+            "width": 258,
+            "height": 58,
+            "right": 328,
+            "bottom": 160
           },
           "testid": "fp-expedition-map-status",
           "hudInstrument": "crest-status",
@@ -562,9 +574,9 @@
           "rect": {
             "x": 24,
             "y": 154,
-            "width": 342,
+            "width": 308,
             "height": 126,
-            "right": 366,
+            "right": 332,
             "bottom": 280
           },
           "testid": "fp-expedition-objective-strip",
@@ -578,10 +590,10 @@
           "visible": true,
           "rect": {
             "x": 24,
-            "y": 608,
-            "width": 342,
-            "height": 124,
-            "right": 366,
+            "y": 631,
+            "width": 310,
+            "height": 101,
+            "right": 334,
             "bottom": 732
           },
           "testid": "fp-expedition-unit-roster",
@@ -594,12 +606,12 @@
           "present": true,
           "visible": true,
           "rect": {
-            "x": 110,
-            "y": 532,
-            "width": 170,
-            "height": 69,
-            "right": 280,
-            "bottom": 601
+            "x": 102,
+            "y": 539,
+            "width": 155,
+            "height": 84,
+            "right": 257,
+            "bottom": 623
           },
           "testid": "fp-expedition-unit-command-bar",
           "hudInstrument": "command-puck",
@@ -689,6 +701,38 @@
       "generatedSpriteAssetsReady": 8,
       "generatedSpriteAssetsVisualOnly": true,
       "generatedSpriteAssetsReadOnly": true,
+      "generatedHudChrome": true,
+      "generatedHudChromeInThreeLayer": true,
+      "generatedHudChromeAssetPack": "hq17c-generated-hud-chrome-v1",
+      "generatedHudChromeManifest": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/manifest.json",
+      "generatedHudChromeSpriteCount": 7,
+      "generatedHudChromeAssetsReady": 7,
+      "generatedHudChromeCleanComposite": true,
+      "generatedHudChromeCleanCompositeVersion": "hq17e_clean_hud_chrome_compositor_v1",
+      "generatedHudChromeSourcePackRetained": true,
+      "generatedHudChromePaintedSourceCrops": false,
+      "generatedHudChromeSpritesVisualOnly": true,
+      "generatedHudChromeSpritesReadOnly": true,
+      "generatedHudChromeSpritesSelectable": false,
+      "generatedHudChromeAuthority": false,
+      "generatedHudMaskLayerVersion": "hq17d_three_masked_profiles_and_text_v1",
+      "generatedHudProfileMasks": true,
+      "generatedHudProfileMasksInThreeLayer": true,
+      "generatedHudProfileMaskSpriteCount": 5,
+      "generatedHudProfileMaskSpriteAssetsReady": 5,
+      "generatedHudProfileMaskType": "circle_alpha_clip",
+      "generatedHudProfileMasksVisualOnly": true,
+      "generatedHudProfileMasksReadOnly": true,
+      "generatedHudProfileMasksSelectable": false,
+      "generatedHudProfileMaskAuthority": false,
+      "generatedHudTextInThreeLayer": true,
+      "generatedHudTextSpriteCount": 5,
+      "generatedHudTextLiveSource": "three_canvas_texture",
+      "generatedHudTextDomA11yOverlayRetained": true,
+      "generatedHudTextSpritesVisualOnly": true,
+      "generatedHudTextSpritesReadOnly": true,
+      "generatedHudTextSpritesSelectable": false,
+      "generatedHudTextAuthority": false,
       "serverTerrainAssetContractVersion": "agenttown_public_terrain_asset_slots_v1",
       "serverTerrainSlotSource": "server_read_model_v1",
       "assetBackedRegionTiles": 12,
@@ -770,7 +814,7 @@
     "commandTargets": [],
     "outpostNextFrontierBeacons": [
       {
-        "unitId": "expedition_unit_outpost_crew_claim_aa74dec9a9cb8d3b",
+        "unitId": "expedition_unit_outpost_crew_claim_f2acc03eccc983df",
         "unitType": "outpost_crew",
         "commandId": "scout_sector",
         "cueLabel": "Next Scout",

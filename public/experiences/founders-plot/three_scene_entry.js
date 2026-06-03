@@ -1352,6 +1352,10 @@ const EXPEDITION_REGION_ASSET_BASE = '/experiences/founders-plot/assets/expediti
 const EXPEDITION_PUBLIC_TERRAIN_ASSET_BASE = `${EXPEDITION_REGION_ASSET_BASE}/hq14s-public-terrain-underlay-v1`;
 const EXPEDITION_SPRITE_ASSET_PACK_VERSION = 'hq15e_expedition_unit_marker_sprites_v1';
 const EXPEDITION_SPRITE_ASSET_BASE = `${EXPEDITION_REGION_ASSET_BASE}/hq15e-expedition-unit-marker-sprites-v1`;
+const EXPEDITION_GENERATED_HUD_CHROME_PACK_ID = 'hq17c-generated-hud-chrome-v1';
+const EXPEDITION_GENERATED_HUD_CHROME_BASE = `${EXPEDITION_REGION_ASSET_BASE}/${EXPEDITION_GENERATED_HUD_CHROME_PACK_ID}`;
+const EXPEDITION_GENERATED_HUD_MASK_LAYER_VERSION = 'hq17d_three_masked_profiles_and_text_v1';
+const EXPEDITION_GENERATED_HUD_CLEAN_COMPOSITE_VERSION = 'hq17e_clean_hud_chrome_compositor_v1';
 const EXPEDITION_PUBLIC_TERRAIN_CONTRACT_VERSION = 'agenttown_public_terrain_asset_slots_v1';
 const EXPEDITION_PUBLIC_TERRAIN_SLOT_SOURCE = 'server_read_model_v1';
 const EXPEDITION_ALLOWED_PUBLIC_TERRAIN_SLOTS = Object.freeze(['field', 'forest', 'ridge', 'settled']);
@@ -1407,8 +1411,45 @@ const EXPEDITION_MARKER_SPRITE_ASSETS = Object.freeze({
   event_packet: { slot: 'event_packet', path: `${EXPEDITION_SPRITE_ASSET_BASE}/event-packet-v1.png`, assetKind: 'generated_marker_sprite' },
   receipt_ledger: { slot: 'receipt_ledger', path: `${EXPEDITION_SPRITE_ASSET_BASE}/receipt-ledger-v1.png`, assetKind: 'generated_marker_sprite' }
 });
+const EXPEDITION_GENERATED_HUD_CHROME_ASSETS = Object.freeze([
+  { slot: 'crest-status', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/crest-status.png`, anchor: 'top-left', widthRatio: 0.42, heightRatio: 0.15, marginX: 0.015, marginY: 0.018, opacity: 0.36 },
+  { slot: 'objective-loop', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/objective-plaque.png`, anchor: 'top-left', widthRatio: 0.32, heightRatio: 0.13, marginX: 0.032, marginY: 0.175, opacity: 0.32 },
+  { slot: 'unit-dock', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/unit-dock.png`, anchor: 'bottom-left', widthRatio: 0.52, heightRatio: 0.19, marginX: 0.012, marginY: 0.015, opacity: 0.36 },
+  { slot: 'command-tray', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/command-tray.png`, anchor: 'bottom-right', widthRatio: 0.34, heightRatio: 0.18, marginX: 0.014, marginY: 0.018, opacity: 0.34 },
+  { slot: 'collapsed-ledger', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/ledger-rail.png`, anchor: 'right', widthRatio: 0.065, heightRatio: 0.58, marginX: 0.010, marginY: 0.19, opacity: 0.36 },
+  { slot: 'selected-context', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/selected-context-frame.png`, anchor: 'bottom-right', widthRatio: 0.27, heightRatio: 0.13, marginX: 0.052, marginY: 0.205, opacity: 0.30 },
+  { slot: 'command-puck', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/command-puck.png`, anchor: 'selected-command', widthRatio: 0.075, heightRatio: 0.11, marginX: 0, marginY: 0, opacity: 0.36 }
+]);
 const expeditionRegionTileImages = new Map();
 const expeditionRegionTileListeners = new Set();
+
+function expeditionGeneratedHudChromeAssets(model = {}) {
+  const fromModel = Array.isArray(model.generatedHudChrome?.assets)
+    ? model.generatedHudChrome.assets
+    : [];
+  const normalized = fromModel
+    .filter((asset) => asset?.path && asset?.slot)
+    .map((asset) => {
+      const fallback = EXPEDITION_GENERATED_HUD_CHROME_ASSETS
+        .find((entry) => String(entry.slot || '') === String(asset.slot || '')) || {};
+      return {
+        ...fallback,
+        ...asset,
+        packId: String(model.generatedHudChrome?.packId || asset.packId || EXPEDITION_GENERATED_HUD_CHROME_PACK_ID),
+        visualOnly: true,
+        readOnly: true,
+        routeAuthority: false,
+        actionAuthority: false,
+        executableActions: 0
+      };
+    });
+  return normalized.length ? normalized : EXPEDITION_GENERATED_HUD_CHROME_ASSETS;
+}
+
+function expeditionGeneratedHudChromeAssetForSlot(slot = '', model = {}) {
+  return expeditionGeneratedHudChromeAssets(model)
+    .find((asset) => String(asset.slot || '') === String(slot || '')) || null;
+}
 
 function hexCss(color, alpha = 1) {
   const value = Number(color || 0);
@@ -3305,6 +3346,276 @@ function makeExpeditionUnitTexture(unit = {}, selected = false) {
   return texture;
 }
 
+function expeditionUnitActionCount(unit = {}) {
+  return (Array.isArray(unit.commandHints) ? unit.commandHints : [])
+    .filter((command) => command?.enabled !== false)
+    .length;
+}
+
+function expeditionHudShortCellLabel(cellId = '') {
+  const raw = String(cellId || '').replace(/^cell[_-]?/i, '').replace(/_/g, ' ').trim();
+  const q = raw.match(/q(-?\d+)/i)?.[1];
+  const r = raw.match(/r(-?\d+)/i)?.[1];
+  if (q != null && r != null) return `Q${q} R${r}`;
+  return raw ? raw.toUpperCase().slice(0, 8) : 'MAP';
+}
+
+function expeditionHudUnitLabel(unit = {}) {
+  const displayName = String(unit.displayName || '').trim();
+  if (displayName) {
+    const words = displayName.split(/\s+/).filter(Boolean);
+    if (words.length > 1) return words.map((word) => word[0]).join('').slice(0, 3).toUpperCase();
+    return displayName.slice(0, 3).toUpperCase();
+  }
+  const type = String(unit.unitType || '').replace(/_/g, ' ');
+  if (/settler/i.test(type)) return 'STL';
+  if (/outpost/i.test(type)) return 'OUT';
+  if (/surveyor/i.test(type)) return 'SRV';
+  if (/courier/i.test(type)) return 'CR';
+  if (/scout/i.test(type)) return 'SCT';
+  return 'UNT';
+}
+
+function makeExpeditionGeneratedHudProfileTexture(unit = {}, selected = false) {
+  const spriteAsset = expeditionUnitSpriteAsset(unit);
+  const spriteReady = !!expeditionRegionTileReady(spriteAsset);
+  const key = `expedition-hud-profile:${EXPEDITION_GENERATED_HUD_MASK_LAYER_VERSION}:${unit.unitId}:${unit.unitType}:${spriteReady ? 'asset' : 'fallback'}:${selected ? 'selected' : 'idle'}`;
+  if (textureCache.has(key)) return textureCache.get(key);
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  const style = expeditionUnitStyle(unit);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = 'rgba(12, 33, 30, 0.36)';
+  ctx.beginPath();
+  ctx.ellipse(128, 210, 74, 19, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  const outer = ctx.createRadialGradient(92, 62, 12, 128, 128, 118);
+  outer.addColorStop(0, 'rgba(255, 248, 232, 0.96)');
+  outer.addColorStop(0.52, selected ? 'rgba(245, 212, 132, 0.92)' : 'rgba(130, 214, 208, 0.70)');
+  outer.addColorStop(1, 'rgba(46, 27, 14, 0.90)');
+  ctx.fillStyle = outer;
+  ctx.beginPath();
+  ctx.arc(128, 123, 88, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(128, 123, 70, 0, Math.PI * 2);
+  ctx.clip();
+  const image = expeditionRegionTileReady(spriteAsset);
+  if (image) {
+    ctx.drawImage(image, 48, 42, 160, 160);
+  } else {
+    const fallback = ctx.createRadialGradient(110, 76, 16, 128, 126, 82);
+    fallback.addColorStop(0, style.accent);
+    fallback.addColorStop(1, style.fill);
+    ctx.fillStyle = fallback;
+    ctx.fillRect(48, 42, 160, 160);
+    ctx.fillStyle = style.accent;
+    ctx.font = '900 54px Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(expeditionHudUnitLabel(unit), 128, 122, 112);
+  }
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.fillStyle = selected ? 'rgba(255, 248, 232, 0.04)' : 'rgba(12, 33, 30, 0.10)';
+  ctx.fillRect(48, 42, 160, 160);
+  ctx.restore();
+
+  ctx.strokeStyle = selected ? '#f5d484' : 'rgba(255, 248, 232, 0.66)';
+  ctx.lineWidth = selected ? 10 : 7;
+  ctx.beginPath();
+  ctx.arc(128, 123, 72, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(12, 33, 30, 0.48)';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(128, 123, 89, -0.78, Math.PI * 1.34);
+  ctx.stroke();
+
+  ctx.fillStyle = selected ? 'rgba(245, 212, 132, 0.98)' : 'rgba(255, 248, 232, 0.92)';
+  ctx.strokeStyle = 'rgba(46, 27, 14, 0.46)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.roundRect(82, 188, 92, 28, 14);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#2e1b0e';
+  ctx.font = '900 18px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(expeditionHudUnitLabel(unit), 128, 203, 72);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  textureCache.set(key, texture);
+  return texture;
+}
+
+function expeditionHudObjectiveLabel(model = {}) {
+  const objective = model.objective && typeof model.objective === 'object' ? model.objective : {};
+  const mode = String(objective.mode || '').toLowerCase();
+  if (mode.includes('packet')) return 'PLAN';
+  if (mode.includes('review')) return 'REVIEW';
+  if (mode.includes('convoy')) return 'CONVOY';
+  if (mode.includes('settle') || mode.includes('found')) return 'FOUND';
+  if (mode.includes('scout')) return 'SCOUT';
+  if (objective.targetCellId) return 'NEXT';
+  return 'READY';
+}
+
+function makeExpeditionGeneratedHudTextTexture(item = {}) {
+  const slot = String(item.slot || '');
+  const title = String(item.title || '').toUpperCase().slice(0, 18);
+  const meta = String(item.meta || '').toUpperCase().slice(0, 24);
+  const tone = String(item.tone || 'light');
+  const key = `expedition-hud-text:${EXPEDITION_GENERATED_HUD_MASK_LAYER_VERSION}:${slot}:${tone}:${title}:${meta}`;
+  if (textureCache.has(key)) return textureCache.get(key);
+  const canvas = document.createElement('canvas');
+  canvas.width = 768;
+  canvas.height = 192;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const light = tone !== 'dark';
+  const centered = slot === 'command-puck';
+  const titleX = centered ? 384 : 30;
+  const metaX = centered ? 384 : 34;
+  ctx.fillStyle = light ? 'rgba(12, 33, 30, 0.42)' : 'rgba(255, 248, 232, 0.68)';
+  ctx.strokeStyle = light ? 'rgba(245, 212, 132, 0.40)' : 'rgba(101, 74, 28, 0.24)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.roundRect(10, 20, 748, 152, 34);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = light ? 'rgba(255, 248, 232, 0.94)' : 'rgba(46, 27, 14, 0.92)';
+  ctx.strokeStyle = light ? 'rgba(12, 33, 30, 0.58)' : 'rgba(255, 248, 232, 0.50)';
+  ctx.shadowColor = light ? 'rgba(12, 33, 30, 0.34)' : 'rgba(255, 248, 232, 0.24)';
+  ctx.shadowBlur = 10;
+  ctx.lineWidth = 8;
+  ctx.textAlign = centered ? 'center' : 'left';
+  ctx.textBaseline = 'middle';
+  ctx.font = '900 64px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  if (title) {
+    ctx.strokeText(title, titleX, 72, 706);
+    ctx.fillText(title, titleX, 72, 706);
+  }
+  ctx.font = '800 36px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  ctx.globalAlpha = 0.90;
+  if (meta) {
+    ctx.strokeText(meta, metaX, 136, 700);
+    ctx.fillText(meta, metaX, 136, 700);
+  }
+  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  textureCache.set(key, texture);
+  return texture;
+}
+
+function makeExpeditionCleanHudChromeTexture(asset = {}) {
+  const slot = String(asset.slot || 'hud');
+  const key = `expedition-clean-hud-chrome:${EXPEDITION_GENERATED_HUD_CLEAN_COMPOSITE_VERSION}:${slot}`;
+  if (textureCache.has(key)) return textureCache.get(key);
+  const vertical = slot === 'collapsed-ledger';
+  const square = slot === 'command-puck';
+  const canvas = document.createElement('canvas');
+  canvas.width = vertical ? 256 : square ? 384 : 1024;
+  canvas.height = vertical ? 1024 : square ? 384 : 320;
+  const ctx = canvas.getContext('2d');
+  const width = canvas.width;
+  const height = canvas.height;
+  const pad = square ? 28 : vertical ? 24 : 34;
+  const radius = square ? 160 : vertical ? 72 : 86;
+  ctx.clearRect(0, 0, width, height);
+
+  const frame = ctx.createLinearGradient(0, 0, width, height);
+  frame.addColorStop(0, slot === 'crest-status' || slot === 'collapsed-ledger'
+    ? 'rgba(12, 33, 30, 0.24)'
+    : 'rgba(255, 248, 232, 0.18)');
+  frame.addColorStop(0.55, slot === 'command-puck' || slot === 'command-tray'
+    ? 'rgba(27, 106, 100, 0.18)'
+    : 'rgba(182, 151, 84, 0.10)');
+  frame.addColorStop(1, slot === 'crest-status' || slot === 'collapsed-ledger'
+    ? 'rgba(22, 62, 56, 0.18)'
+    : 'rgba(12, 33, 30, 0.08)');
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(12, 33, 30, 0.14)';
+  ctx.shadowBlur = 8;
+  ctx.shadowOffsetY = 3;
+  ctx.fillStyle = frame;
+  ctx.beginPath();
+  ctx.roundRect(pad, pad, width - (pad * 2), height - (pad * 2), radius);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.strokeStyle = 'rgba(245, 212, 132, 0.38)';
+  ctx.lineWidth = square ? 10 : vertical ? 8 : 7;
+  ctx.beginPath();
+  ctx.roundRect(pad + 6, pad + 6, width - ((pad + 6) * 2), height - ((pad + 6) * 2), Math.max(24, radius - 14));
+  ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(12, 33, 30, 0.24)';
+  ctx.lineWidth = square ? 5 : 4;
+  ctx.beginPath();
+  ctx.roundRect(pad + 22, pad + 22, width - ((pad + 22) * 2), height - ((pad + 22) * 2), Math.max(18, radius - 30));
+  ctx.stroke();
+
+  ctx.globalAlpha = 0.42;
+  ctx.strokeStyle = slot === 'crest-status' || slot === 'collapsed-ledger'
+    ? 'rgba(255, 248, 232, 0.46)'
+    : 'rgba(46, 27, 14, 0.34)';
+  ctx.lineWidth = 3;
+  if (slot === 'unit-dock') {
+    ctx.beginPath();
+    ctx.arc(152, height / 2, 92, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(152, height / 2, 58, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (slot === 'crest-status') {
+    ctx.beginPath();
+    ctx.arc(172, height / 2, 74, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(172, (height / 2) - 46);
+    ctx.lineTo(204, height / 2);
+    ctx.lineTo(172, (height / 2) + 46);
+    ctx.lineTo(140, height / 2);
+    ctx.closePath();
+    ctx.stroke();
+  } else if (slot === 'collapsed-ledger') {
+    for (let index = 0; index < 7; index += 1) {
+      const y = 180 + (index * 96);
+      ctx.beginPath();
+      ctx.arc(width / 2, y, 16, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  } else if (slot === 'command-puck') {
+    ctx.beginPath();
+    ctx.arc(width / 2, height / 2, 108, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  textureCache.set(key, texture);
+  return texture;
+}
+
 function detailFromExpeditionUnit(object, source = 'expedition-three-raycast') {
   const data = object?.userData || {};
   return {
@@ -3795,6 +4106,9 @@ class ExpeditionMapThreeStage {
     this.eventMarkerSprites = [];
     this.objectiveMarkerSprites = [];
     this.outpostFrontierBeaconSprites = [];
+    this.generatedHudChromeSprites = [];
+    this.generatedHudProfileSprites = [];
+    this.generatedHudTextSprites = [];
     this.outcomeFeedback = null;
     this.hoverCellId = '';
     this.terrainUnderlayCount = 0;
@@ -3806,6 +4120,9 @@ class ExpeditionMapThreeStage {
     this.eventMarkerCount = 0;
     this.objectiveMarkerCount = 0;
     this.outpostFrontierBeaconCount = 0;
+    this.generatedHudChromeCount = 0;
+    this.generatedHudProfileCount = 0;
+    this.generatedHudTextCount = 0;
     this.scene = new THREE.Scene();
     this.camera = new THREE.OrthographicCamera(-EXPEDITION_WORLD_WIDTH / 2, EXPEDITION_WORLD_WIDTH / 2, EXPEDITION_WORLD_HEIGHT / 2, -EXPEDITION_WORLD_HEIGHT / 2, 0.1, 100);
     this.camera.position.set(0, 0, 10);
@@ -3891,6 +4208,9 @@ class ExpeditionMapThreeStage {
     this.eventMarkerSprites = [];
     this.objectiveMarkerSprites = [];
     this.outpostFrontierBeaconSprites = [];
+    this.generatedHudChromeSprites = [];
+    this.generatedHudProfileSprites = [];
+    this.generatedHudTextSprites = [];
     this.terrainUnderlayCount = 0;
     this.surveyStrokeCount = 0;
     this.markerCount = 0;
@@ -3900,6 +4220,9 @@ class ExpeditionMapThreeStage {
     this.eventMarkerCount = 0;
     this.objectiveMarkerCount = 0;
     this.outpostFrontierBeaconCount = 0;
+    this.generatedHudChromeCount = 0;
+    this.generatedHudProfileCount = 0;
+    this.generatedHudTextCount = 0;
     this.edgeFogCount = 0;
     this.civicBeaconCount = 0;
   }
@@ -4308,6 +4631,8 @@ class ExpeditionMapThreeStage {
         this.scene.add(sprite);
       });
     }
+    this.addGeneratedHudChromeLayer();
+    this.addGeneratedHudContentLayer();
     this.updateInfo();
   }
 
@@ -4316,6 +4641,245 @@ class ExpeditionMapThreeStage {
       width: Math.max(0.01, (this.camera.right - this.camera.left) / this.camera.zoom),
       height: Math.max(0.01, (this.camera.top - this.camera.bottom) / this.camera.zoom)
     };
+  }
+
+  addGeneratedHudChromeLayer() {
+    this.generatedHudChromeSprites = [];
+    const assets = expeditionGeneratedHudChromeAssets(this.model);
+    assets.forEach((asset, index) => {
+      const texture = makeExpeditionCleanHudChromeTexture(asset);
+      if (!texture) return;
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        depthWrite: false,
+        depthTest: false,
+        opacity: clamp(number(asset.opacity, 0.72) * 0.62, 0.16, 0.34),
+        alphaTest: 0.02
+      }));
+      sprite.renderOrder = 900 + index;
+      sprite.userData = {
+        kind: 'expedition_generated_hud_chrome',
+        packId: String(asset.packId || this.model.generatedHudChrome?.packId || EXPEDITION_GENERATED_HUD_CHROME_PACK_ID),
+        slot: String(asset.slot || ''),
+        assetPath: String(asset.path || ''),
+        anchor: String(asset.anchor || ''),
+        widthRatio: number(asset.widthRatio, 0.2),
+        heightRatio: number(asset.heightRatio, 0.16),
+        marginX: number(asset.marginX, 0.02),
+        marginY: number(asset.marginY, 0.02),
+        assetReady: true,
+        cleanCompositeVersion: EXPEDITION_GENERATED_HUD_CLEAN_COMPOSITE_VERSION,
+        chromeSource: 'three_canvas_clean_frame',
+        sourceAssetPath: String(asset.path || ''),
+        liveTextSource: 'dom',
+        visualOnly: true,
+        readOnly: true,
+        selectable: false,
+        routeAuthority: false,
+        actionAuthority: false,
+        executableActions: 0
+      };
+      this.generatedHudChromeSprites.push(sprite);
+      this.scene.add(sprite);
+    });
+    this.generatedHudChromeCount = this.generatedHudChromeSprites.length;
+    this.syncGeneratedHudChromeSprites();
+  }
+
+  generatedHudBoundsForData(data = {}) {
+    const visible = this.visibleSize();
+    const left = this.camera.position.x - (visible.width / 2);
+    const right = this.camera.position.x + (visible.width / 2);
+    const top = this.camera.position.y + (visible.height / 2);
+    const bottom = this.camera.position.y - (visible.height / 2);
+    const width = clamp(number(data.widthRatio, 0.2) * visible.width, 0.35, visible.width * 0.88);
+    const height = clamp(number(data.heightRatio, 0.16) * visible.height, 0.26, visible.height * 0.80);
+    const marginX = number(data.marginX, 0.02) * visible.width;
+    const marginY = number(data.marginY, 0.02) * visible.height;
+    let x = left + marginX + (width / 2);
+    let y = top - marginY - (height / 2);
+    if (data.anchor === 'bottom-left') {
+      y = bottom + marginY + (height / 2);
+    } else if (data.anchor === 'bottom-right') {
+      x = right - marginX - (width / 2);
+      y = bottom + marginY + (height / 2);
+    } else if (data.anchor === 'right') {
+      x = right - marginX - (width / 2);
+      y = top - marginY - (height / 2);
+    } else if (data.anchor === 'selected-command') {
+      x = this.camera.position.x + (visible.width * 0.18);
+      y = bottom + (visible.height * 0.28);
+    }
+    return {
+      x,
+      y,
+      width,
+      height,
+      left: x - (width / 2),
+      right: x + (width / 2),
+      top: y + (height / 2),
+      bottom: y - (height / 2)
+    };
+  }
+
+  generatedHudBoundsForSlot(slot = '') {
+    const sprite = this.generatedHudChromeSprites
+      .find((entry) => String(entry.userData?.slot || '') === String(slot || ''));
+    if (sprite) return this.generatedHudBoundsForData(sprite.userData || {});
+    const fallback = expeditionGeneratedHudChromeAssetForSlot(slot, this.model) || {};
+    return this.generatedHudBoundsForData(fallback);
+  }
+
+  syncGeneratedHudChromeSprites() {
+    if (!this.generatedHudChromeSprites.length) return;
+    this.generatedHudChromeSprites.forEach((sprite) => {
+      const bounds = this.generatedHudBoundsForData(sprite.userData || {});
+      sprite.position.set(bounds.x, bounds.y, 4.25);
+      sprite.scale.set(bounds.width, bounds.height, 1);
+    });
+  }
+
+  addGeneratedHudContentLayer() {
+    this.generatedHudProfileSprites = [];
+    this.generatedHudTextSprites = [];
+    const units = Array.isArray(this.model.units?.items) ? this.model.units.items.filter((unit) => unit?.unitId).slice(0, 6) : [];
+    const selectedUnit = units.find((unit) => String(unit.unitId || '') === String(this.selectedUnitId || '')) || units[0] || null;
+    units.forEach((unit, index) => {
+      const selected = String(unit.unitId || '') === String(selectedUnit?.unitId || '');
+      const spriteAsset = expeditionUnitSpriteAsset(unit);
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: makeExpeditionGeneratedHudProfileTexture(unit, selected),
+        transparent: true,
+        depthWrite: false,
+        depthTest: false,
+        alphaTest: 0.04
+      }));
+      sprite.renderOrder = 940 + index;
+      sprite.userData = {
+        kind: 'expedition_generated_hud_profile_mask',
+        layerVersion: EXPEDITION_GENERATED_HUD_MASK_LAYER_VERSION,
+        slot: 'unit-profile',
+        unitId: String(unit.unitId || ''),
+        unitType: String(unit.unitType || ''),
+        displayName: String(unit.displayName || ''),
+        profileMask: 'circle_alpha_clip',
+        profileSource: 'three_canvas_texture',
+        spriteAssetSlot: String(spriteAsset?.slot || ''),
+        spriteAssetPath: String(spriteAsset?.path || ''),
+        spriteAssetReady: !!expeditionRegionTileReady(spriteAsset),
+        visualOnly: true,
+        readOnly: true,
+        selectable: false,
+        routeAuthority: false,
+        actionAuthority: false,
+        executableActions: 0
+      };
+      this.generatedHudProfileSprites.push(sprite);
+      this.scene.add(sprite);
+    });
+    this.generatedHudProfileCount = this.generatedHudProfileSprites.length;
+
+    const cells = Array.isArray(this.model.cells) ? this.model.cells : [];
+    const selectedCell = cells.find((cell) => String(cell.cellId || '') === String(this.selectedCellId || '')) || cells[0] || {};
+    const revealed = cells.filter((cell) => ['known', 'discovered'].includes(String(cell.fogState || ''))).length;
+    const hidden = cells.length - revealed;
+    const objective = this.model.objective && typeof this.model.objective === 'object' ? this.model.objective : {};
+    const commandCount = selectedUnit ? expeditionUnitActionCount(selectedUnit) : 0;
+    const textItems = [
+      { slot: 'crest-status', title: 'EXPEDITION', meta: `${revealed} MAP / ${hidden} FOG`, tone: 'light' },
+      { slot: 'objective-loop', title: expeditionHudObjectiveLabel(this.model), meta: objective.targetCellId ? expeditionHudShortCellLabel(objective.targetCellId) : 'READY', tone: 'dark' },
+      { slot: 'unit-dock', title: `${units.length} UNITS`, meta: selectedUnit ? expeditionHudUnitLabel(selectedUnit) : 'SELECT', tone: 'dark' },
+      { slot: 'command-puck', title: commandCount ? `${commandCount} CMD` : 'CMD', meta: selectedUnit ? expeditionHudUnitLabel(selectedUnit) : 'READY', tone: 'light' },
+      { slot: 'selected-context', title: expeditionHudShortCellLabel(selectedCell.cellId || this.selectedCellId), meta: String(selectedCell.fogState || 'sector').replace(/_/g, ' '), tone: 'dark' }
+    ];
+    textItems.forEach((item, index) => {
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: makeExpeditionGeneratedHudTextTexture(item),
+        transparent: true,
+        depthWrite: false,
+        depthTest: false,
+        opacity: 0.88,
+        alphaTest: 0.03
+      }));
+      sprite.renderOrder = 960 + index;
+      sprite.userData = {
+        kind: 'expedition_generated_hud_text',
+        layerVersion: EXPEDITION_GENERATED_HUD_MASK_LAYER_VERSION,
+        slot: String(item.slot || ''),
+        title: String(item.title || ''),
+        meta: String(item.meta || ''),
+        liveTextSource: 'three_canvas_texture',
+        domA11yOverlayRetained: true,
+        visualOnly: true,
+        readOnly: true,
+        selectable: false,
+        routeAuthority: false,
+        actionAuthority: false,
+        executableActions: 0
+      };
+      this.generatedHudTextSprites.push(sprite);
+      this.scene.add(sprite);
+    });
+    this.generatedHudTextCount = this.generatedHudTextSprites.length;
+    this.syncGeneratedHudContentSprites();
+  }
+
+  syncGeneratedHudContentSprites() {
+    const unitDock = this.generatedHudBoundsForSlot('unit-dock');
+    const profiles = this.generatedHudProfileSprites;
+    const compactHud = Number(this.canvas?.clientWidth || 0) <= 520;
+    if (profiles.length) {
+      const profileSize = compactHud
+        ? clamp(Math.min(unitDock.height * 0.54, unitDock.width / Math.max(4.4, profiles.length + 1.8)), 0.42, 0.66)
+        : clamp(Math.min(unitDock.height * 0.46, unitDock.width / Math.max(5.2, profiles.length + 1.8)), 0.40, 0.78);
+      const step = compactHud
+        ? clamp(unitDock.width * 0.14, profileSize * 1.10, profileSize * 1.50)
+        : clamp(unitDock.width * 0.115, profileSize * 1.18, profileSize * 1.72);
+      const startX = unitDock.left + (unitDock.width * (compactHud ? 0.50 : 0.32));
+      const y = unitDock.bottom + (unitDock.height * (compactHud ? 0.52 : 0.50));
+      profiles.forEach((sprite, index) => {
+        sprite.position.set(startX + (index * step), y, 4.50 + (index * 0.004));
+        sprite.scale.set(profileSize, profileSize, 1);
+      });
+    }
+
+    this.generatedHudTextSprites.forEach((sprite) => {
+      const slot = String(sprite.userData?.slot || '');
+      let bounds = this.generatedHudBoundsForSlot(slot);
+      let width = bounds.width * 0.48;
+      let height = bounds.height * 0.46;
+      let x = bounds.left + (bounds.width * 0.42);
+      let y = bounds.top - (bounds.height * 0.50);
+      let maxWidth = bounds.width;
+      let maxHeight = bounds.height;
+      if (slot === 'objective-loop') {
+        width = bounds.width * 0.68;
+        height = bounds.height * 0.52;
+        x = bounds.left + (bounds.width * 0.54);
+        y = bounds.top - (bounds.height * 0.50);
+      } else if (slot === 'unit-dock') {
+        width = bounds.width * (compactHud ? 0.34 : 0.26);
+        height = bounds.height * 0.46;
+        x = bounds.left + (bounds.width * (compactHud ? 0.34 : 0.16));
+        y = bounds.bottom + (bounds.height * 0.56);
+      } else if (slot === 'command-puck') {
+        bounds = this.generatedHudBoundsForSlot('command-tray');
+        width = bounds.width * 0.54;
+        height = bounds.height * 0.58;
+        x = bounds.left + (bounds.width * 0.49);
+        y = bounds.top - (bounds.height * 0.48);
+        maxWidth = bounds.width * 0.74;
+        maxHeight = bounds.height * 0.78;
+      } else if (slot === 'selected-context') {
+        width = bounds.width * 0.72;
+        height = bounds.height * 0.60;
+        x = bounds.left + (bounds.width * 0.56);
+        y = bounds.top - (bounds.height * 0.50);
+      }
+      sprite.position.set(x, y, 4.62);
+      sprite.scale.set(clamp(width, 0.58, maxWidth), clamp(height, 0.24, maxHeight), 1);
+    });
   }
 
   applyCameraBounds() {
@@ -4502,6 +5066,8 @@ class ExpeditionMapThreeStage {
   }
 
   updateInfo() {
+    this.syncGeneratedHudChromeSprites();
+    this.syncGeneratedHudContentSprites();
     const canvas = this.renderer.domElement;
     const regionVisuals = this.cells.map((cell) => {
       const fogState = String(cell.fogState || 'locked_unknown');
@@ -4545,6 +5111,57 @@ class ExpeditionMapThreeStage {
     const generatedSpriteAssetReadyCount = generatedSpriteAssets
       .filter((asset) => !!ensureExpeditionRegionTileImage(asset))
       .length;
+    const generatedHudChromeSprites = this.generatedHudChromeSprites.map((sprite) => ({
+      slot: String(sprite.userData?.slot || ''),
+      packId: String(sprite.userData?.packId || ''),
+      assetPath: String(sprite.userData?.assetPath || ''),
+      anchor: String(sprite.userData?.anchor || ''),
+      assetReady: sprite.userData?.assetReady === true,
+      cleanCompositeVersion: String(sprite.userData?.cleanCompositeVersion || ''),
+      chromeSource: String(sprite.userData?.chromeSource || ''),
+      sourceAssetPath: String(sprite.userData?.sourceAssetPath || ''),
+      liveTextSource: String(sprite.userData?.liveTextSource || ''),
+      visualOnly: sprite.userData?.visualOnly === true,
+      readOnly: sprite.userData?.readOnly === true,
+      selectable: sprite.userData?.selectable === true,
+      routeAuthority: sprite.userData?.routeAuthority === true,
+      actionAuthority: sprite.userData?.actionAuthority === true,
+      executableActions: Number(sprite.userData?.executableActions || 0),
+      canvas: this.canvasPointForObject(sprite)
+    }));
+    const generatedHudProfileSprites = this.generatedHudProfileSprites.map((sprite) => ({
+      slot: String(sprite.userData?.slot || ''),
+      layerVersion: String(sprite.userData?.layerVersion || ''),
+      unitId: String(sprite.userData?.unitId || ''),
+      unitType: String(sprite.userData?.unitType || ''),
+      profileMask: String(sprite.userData?.profileMask || ''),
+      profileSource: String(sprite.userData?.profileSource || ''),
+      spriteAssetSlot: String(sprite.userData?.spriteAssetSlot || ''),
+      spriteAssetPath: String(sprite.userData?.spriteAssetPath || ''),
+      spriteAssetReady: sprite.userData?.spriteAssetReady === true,
+      visualOnly: sprite.userData?.visualOnly === true,
+      readOnly: sprite.userData?.readOnly === true,
+      selectable: sprite.userData?.selectable === true,
+      routeAuthority: sprite.userData?.routeAuthority === true,
+      actionAuthority: sprite.userData?.actionAuthority === true,
+      executableActions: Number(sprite.userData?.executableActions || 0),
+      canvas: this.canvasPointForObject(sprite)
+    }));
+    const generatedHudTextSprites = this.generatedHudTextSprites.map((sprite) => ({
+      slot: String(sprite.userData?.slot || ''),
+      layerVersion: String(sprite.userData?.layerVersion || ''),
+      title: String(sprite.userData?.title || ''),
+      meta: String(sprite.userData?.meta || ''),
+      liveTextSource: String(sprite.userData?.liveTextSource || ''),
+      domA11yOverlayRetained: sprite.userData?.domA11yOverlayRetained === true,
+      visualOnly: sprite.userData?.visualOnly === true,
+      readOnly: sprite.userData?.readOnly === true,
+      selectable: sprite.userData?.selectable === true,
+      routeAuthority: sprite.userData?.routeAuthority === true,
+      actionAuthority: sprite.userData?.actionAuthority === true,
+      executableActions: Number(sprite.userData?.executableActions || 0),
+      canvas: this.canvasPointForObject(sprite)
+    }));
     this.info = {
       renderer: 'three.js',
       surface: 'expedition-map',
@@ -4568,6 +5185,38 @@ class ExpeditionMapThreeStage {
           generatedSpriteAssetsReady: generatedSpriteAssetReadyCount,
           generatedSpriteAssetsVisualOnly: true,
           generatedSpriteAssetsReadOnly: true,
+          generatedHudChrome: true,
+          generatedHudChromeInThreeLayer: true,
+          generatedHudChromeAssetPack: String(this.model.generatedHudChrome?.packId || EXPEDITION_GENERATED_HUD_CHROME_PACK_ID),
+          generatedHudChromeManifest: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/manifest.json`,
+          generatedHudChromeSpriteCount: generatedHudChromeSprites.length,
+          generatedHudChromeAssetsReady: generatedHudChromeSprites.filter((sprite) => sprite.assetReady).length,
+          generatedHudChromeCleanComposite: true,
+          generatedHudChromeCleanCompositeVersion: EXPEDITION_GENERATED_HUD_CLEAN_COMPOSITE_VERSION,
+          generatedHudChromeSourcePackRetained: generatedHudChromeSprites.every((sprite) => sprite.sourceAssetPath.includes(`/${EXPEDITION_GENERATED_HUD_CHROME_PACK_ID}/`)),
+          generatedHudChromePaintedSourceCrops: generatedHudChromeSprites.some((sprite) => sprite.chromeSource !== 'three_canvas_clean_frame'),
+          generatedHudChromeSpritesVisualOnly: generatedHudChromeSprites.every((sprite) => sprite.visualOnly),
+          generatedHudChromeSpritesReadOnly: generatedHudChromeSprites.every((sprite) => sprite.readOnly),
+          generatedHudChromeSpritesSelectable: generatedHudChromeSprites.some((sprite) => sprite.selectable),
+          generatedHudChromeAuthority: generatedHudChromeSprites.some((sprite) => sprite.routeAuthority || sprite.actionAuthority || sprite.executableActions > 0),
+          generatedHudMaskLayerVersion: EXPEDITION_GENERATED_HUD_MASK_LAYER_VERSION,
+          generatedHudProfileMasks: true,
+          generatedHudProfileMasksInThreeLayer: true,
+          generatedHudProfileMaskSpriteCount: generatedHudProfileSprites.length,
+          generatedHudProfileMaskSpriteAssetsReady: generatedHudProfileSprites.filter((sprite) => sprite.spriteAssetReady).length,
+          generatedHudProfileMaskType: 'circle_alpha_clip',
+          generatedHudProfileMasksVisualOnly: generatedHudProfileSprites.every((sprite) => sprite.visualOnly),
+          generatedHudProfileMasksReadOnly: generatedHudProfileSprites.every((sprite) => sprite.readOnly),
+          generatedHudProfileMasksSelectable: generatedHudProfileSprites.some((sprite) => sprite.selectable),
+          generatedHudProfileMaskAuthority: generatedHudProfileSprites.some((sprite) => sprite.routeAuthority || sprite.actionAuthority || sprite.executableActions > 0),
+          generatedHudTextInThreeLayer: true,
+          generatedHudTextSpriteCount: generatedHudTextSprites.length,
+          generatedHudTextLiveSource: 'three_canvas_texture',
+          generatedHudTextDomA11yOverlayRetained: generatedHudTextSprites.every((sprite) => sprite.domA11yOverlayRetained),
+          generatedHudTextSpritesVisualOnly: generatedHudTextSprites.every((sprite) => sprite.visualOnly),
+          generatedHudTextSpritesReadOnly: generatedHudTextSprites.every((sprite) => sprite.readOnly),
+          generatedHudTextSpritesSelectable: generatedHudTextSprites.some((sprite) => sprite.selectable),
+          generatedHudTextAuthority: generatedHudTextSprites.some((sprite) => sprite.routeAuthority || sprite.actionAuthority || sprite.executableActions > 0),
           serverTerrainAssetContractVersion: EXPEDITION_PUBLIC_TERRAIN_CONTRACT_VERSION,
           serverTerrainSlotSource: EXPEDITION_PUBLIC_TERRAIN_SLOT_SOURCE,
           assetBackedRegionTiles: regionVisuals.filter((cell) => cell.assetPath).length,
@@ -4651,6 +5300,9 @@ class ExpeditionMapThreeStage {
         commandOutcomeFeedbackAuthority: false,
         clientAuthority: false
       },
+      generatedHudChromeSprites,
+      generatedHudProfileSprites,
+      generatedHudTextSprites,
       regionConsistency: {
         waterCueCells: regionVisuals.filter((cell) => cell.waterCue).map((cell) => cell.cellId),
         ruinSignalCueCells: regionVisuals.filter((cell) => cell.ruinSignalCue).map((cell) => cell.cellId),

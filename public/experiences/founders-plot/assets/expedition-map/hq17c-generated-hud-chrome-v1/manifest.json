@@ -1,0 +1,61 @@
+{
+  "packId": "hq17c-generated-hud-chrome-v1",
+  "label": "HQ17C Generated HUD Chrome",
+  "source": {
+    "model": "openai/gpt-image-2",
+    "concept": "agent-town-hq17a-fullscreen-hud-redesign-concept-01-2026-06-03.png",
+    "report": "reports/agent-town-hq17a-gpt-image-2-fullscreen-hud-redesign-review-2026-06-03.md"
+  },
+  "runtimePolicy": {
+    "presentationOnly": true,
+    "visualOnly": true,
+    "readOnly": true,
+    "serverAuthority": false,
+    "routeAuthority": false,
+    "actionAuthority": false,
+    "executableActions": 0,
+    "liveTextSource": "DOM/CSS live HUD slots with HQ17D Three.js canvas-text mirror",
+    "maskLayer": "hq17d_three_masked_profiles_and_text_v1",
+    "cleanComposite": "hq17e_clean_hud_chrome_compositor_v1",
+    "sourceCropPolicy": "source crop paths retained for provenance/style reference; live runtime chrome is redrawn as clean Three.js canvas frames to avoid baked duplicate HUD contents",
+    "profileMasks": "Three.js canvas-texture circular alpha clips for unit profile medallions",
+    "domPolicy": "DOM remains as accessible/clickable hit layer; generated masks/text remain presentation-only"
+  },
+  "slots": {
+    "crest-status": {
+      "file": "crest-status.png",
+      "crop": "622x190+0+0",
+      "anchor": "top-left"
+    },
+    "objective-loop": {
+      "file": "objective-plaque.png",
+      "crop": "460x160+166+12",
+      "anchor": "top-left"
+    },
+    "unit-dock": {
+      "file": "unit-dock.png",
+      "crop": "918x224+0+928",
+      "anchor": "bottom-left"
+    },
+    "command-tray": {
+      "file": "command-tray.png",
+      "crop": "581x209+1467+943",
+      "anchor": "bottom-right"
+    },
+    "collapsed-ledger": {
+      "file": "ledger-rail.png",
+      "crop": "120x625+1928+260",
+      "anchor": "right"
+    },
+    "selected-context": {
+      "file": "selected-context-frame.png",
+      "crop": "420x150+1518+952",
+      "anchor": "bottom-right"
+    },
+    "command-puck": {
+      "file": "command-puck.png",
+      "crop": "132x132+720+744",
+      "anchor": "selected-command"
+    }
+  }
+}

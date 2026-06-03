@@ -202,8 +202,10 @@ async function collectHudProof(page) {
 
 function assertHudLayout(proof, { mobile = false } = {}) {
   expect(proof.bodyClasses).toContain('fp-expedition-map-body--hq17b-option1');
+  expect(proof.bodyClasses).toContain('fp-expedition-map-body--hq17c-generated-chrome');
   expect(proof.panelClasses).toContain('fp-expedition-map-panel--hq17b-option1');
-  expect(proof.board.composition).toBe('hq17b_option1_runtime');
+  expect(proof.panelClasses).toContain('fp-expedition-map-panel--hq17c-generated-chrome');
+  expect(proof.board.composition).toBe('hq17c_generated_chrome_runtime');
   expect(proof.endpointNamesInPrimaryText).toBe(false);
   expect(proof.proofWordsInPrimaryText).toBe(false);
   ['crestStatus', 'objectiveLoop', 'unitDock', 'commandPuck', 'selectedContext', 'selectedSector', 'collapsedLedger']
@@ -395,7 +397,7 @@ test('FP-E2E-022B1 HQ17B option 1 runtime HUD maps the continuous loop into map-
     guardrails: {
       optionOneRuntimeClassPresent: desktopHud.bodyClasses.includes('fp-expedition-map-body--hq17b-option1'),
       optionOnePanelClassPresent: desktopHud.panelClasses.includes('fp-expedition-map-panel--hq17b-option1'),
-      mapFirstHudComposition: desktopHud.board.composition === 'hq17b_option1_runtime',
+      mapFirstHudComposition: desktopHud.board.composition === 'hq17c_generated_chrome_runtime',
       requiredHudSlotsVisible: [
         'crestStatus',
         'objectiveLoop',

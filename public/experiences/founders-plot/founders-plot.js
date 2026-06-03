@@ -42,6 +42,50 @@
 
   const RES_ICONS = { wood: '🪵', stone: '🪨', food: '🌾', coin: '🪙', scout_report: '🧭' };
   const FP_ASSET_BASE = '/experiences/founders-plot/assets';
+  const EXPEDITION_GENERATED_HUD_CHROME_PACK_ID = 'hq17c-generated-hud-chrome-v1';
+  const EXPEDITION_GENERATED_HUD_MASK_LAYER_ID = 'hq17d_three_masked_profiles_and_text_v1';
+  const EXPEDITION_GENERATED_HUD_CLEAN_COMPOSITE_ID = 'hq17e_clean_hud_chrome_compositor_v1';
+  const EXPEDITION_GENERATED_HUD_CHROME_BASE = `${FP_ASSET_BASE}/expedition-map/${EXPEDITION_GENERATED_HUD_CHROME_PACK_ID}`;
+  const EXPEDITION_GENERATED_HUD_CHROME_ASSETS = Object.freeze({
+    'crest-status': { slot: 'crest-status', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/crest-status.png`, anchor: 'top-left' },
+    'objective-loop': { slot: 'objective-loop', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/objective-plaque.png`, anchor: 'top-left' },
+    'unit-dock': { slot: 'unit-dock', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/unit-dock.png`, anchor: 'bottom-left' },
+    'command-tray': { slot: 'command-tray', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/command-tray.png`, anchor: 'bottom-right' },
+    'collapsed-ledger': { slot: 'collapsed-ledger', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/ledger-rail.png`, anchor: 'right' },
+    'selected-context': { slot: 'selected-context', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/selected-context-frame.png`, anchor: 'bottom-right' },
+    'command-puck': { slot: 'command-puck', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/command-puck.png`, anchor: 'selected-command' },
+  });
+  function expeditionGeneratedHudChromeAsset(slot) {
+    return EXPEDITION_GENERATED_HUD_CHROME_ASSETS[String(slot || '')] || null;
+  }
+  function expeditionGeneratedHudChromeModel() {
+    return {
+      packId: EXPEDITION_GENERATED_HUD_CHROME_PACK_ID,
+      manifestPath: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/manifest.json`,
+      sourceConcept: 'agent-town-hq17a-fullscreen-hud-redesign-concept-01-2026-06-03.png',
+      visualOnly: true,
+      readOnly: true,
+      routeAuthority: false,
+      actionAuthority: false,
+      executableActions: 0,
+      cleanComposite: EXPEDITION_GENERATED_HUD_CLEAN_COMPOSITE_ID,
+      assets: Object.values(EXPEDITION_GENERATED_HUD_CHROME_ASSETS),
+    };
+  }
+  function bindExpeditionGeneratedHudChrome(node, slot) {
+    const asset = expeditionGeneratedHudChromeAsset(slot);
+    if (!node || !asset?.path) return node;
+    node.dataset.generatedChromePack = EXPEDITION_GENERATED_HUD_CHROME_PACK_ID;
+    node.dataset.generatedChromeSlot = String(asset.slot || slot);
+    node.dataset.generatedChromeSrc = String(asset.path || '');
+    node.dataset.generatedChromePresentationOnly = 'true';
+    node.dataset.generatedChromeLiveText = 'dom';
+    node.dataset.generatedChromeTextLayer = 'three-canvas';
+    node.dataset.generatedChromeCleanComposite = EXPEDITION_GENERATED_HUD_CLEAN_COMPOSITE_ID;
+    node.style.setProperty('--fp-generated-hud-chrome', `url("${asset.path}")`);
+    node.classList.add('fp-expedition-generated-chrome-frame');
+    return node;
+  }
   const CARD_ART = Object.freeze({
     scoutReport: `${FP_ASSET_BASE}/objects/scout-report-dossier.webp`,
     sitePlan: `${FP_ASSET_BASE}/objects/site-plan-dossier.webp`,
@@ -1106,6 +1150,7 @@
     hud.className = 'fp-expedition-map-visual-hud';
     hud.dataset.testid = 'fp-expedition-map-visual-hud';
     hud.dataset.hudInstrument = 'selected-context';
+    bindExpeditionGeneratedHudChrome(hud, 'selected-context');
     hud.dataset.selectedCellId = String(selectedCell.cellId || '');
     hud.dataset.fogState = fogState;
     hud.dataset.scoutable = selectedScoutable ? 'true' : 'false';
@@ -1145,6 +1190,7 @@
     selected.dataset.receiptCount = String(expeditionReceiptCount(selectedCell, packet));
     selected.dataset.partyCount = String(partyMembers.length);
     selected.dataset.hudInstrument = 'selected-sector';
+    bindExpeditionGeneratedHudChrome(selected, 'selected-context');
     selected.title = [
       `Selected ${selectedCell.cellId || 'cell'}`,
       `${friendlyToken(fogState)} fog`,
@@ -1346,6 +1392,7 @@
     surface.dataset.bridgeReadOnly = 'true';
     surface.dataset.bridgeActions = '0';
     surface.dataset.hudInstrument = 'outpost-context';
+    bindExpeditionGeneratedHudChrome(surface, 'selected-context');
     if (outpost.nextCell?.cellId) surface.dataset.mapNativeCue = 'next_scout';
 
     const chips = document.createElement('div');
@@ -1385,6 +1432,7 @@
       cue.dataset.routeAuthority = 'false';
       cue.dataset.resourceDelta = '{}';
       cue.dataset.hudInstrument = 'next-scout-cue';
+      bindExpeditionGeneratedHudChrome(cue, 'command-puck');
       cue.title = `Next Scout cue for ${outpost.nextCell.cellId}. The actual mutation remains the existing Scout Sector command.`;
       cue.setAttribute('aria-label', cue.title);
       const icon = document.createElement('i');
@@ -1446,6 +1494,7 @@
     roster.dataset.actions = '0';
     roster.dataset.movementMutation = movementReady ? 'true' : 'false';
     roster.dataset.hudInstrument = 'unit-dock';
+    bindExpeditionGeneratedHudChrome(roster, 'unit-dock');
 
     const head = document.createElement('div');
     head.className = 'fp-expedition-unit-roster__head';
@@ -1476,6 +1525,8 @@
       button.dataset.unitId = String(unit.unitId || '');
       button.dataset.unitType = String(unit.unitType || '');
       button.dataset.cellId = String(unit.cellId || '');
+      button.dataset.generatedHudProfileMask = 'three-canvas-circle';
+      button.dataset.generatedHudMaskLayer = EXPEDITION_GENERATED_HUD_MASK_LAYER_ID;
       button.dataset.readOnly = unit.readOnly === false ? 'false' : 'true';
       button.dataset.movementMutation = unit.movement?.movementMutationImplemented === true ? 'true' : 'false';
       const unitActionCount = expeditionUnitActionCount(unit, model, selected ? selectedCell : null);
@@ -1529,6 +1580,7 @@
       commandBar.dataset.movementMutation = selectedUnit.movement?.movementMutationImplemented === true ? 'true' : 'false';
       commandBar.dataset.actions = String(actionCount);
       commandBar.dataset.hudInstrument = 'command-puck';
+      bindExpeditionGeneratedHudChrome(commandBar, 'command-puck');
       const label = document.createElement('small');
       label.className = 'fp-expedition-unit-command-bar__unit';
       label.dataset.testid = 'fp-expedition-unit-command-selected';
@@ -1852,6 +1904,8 @@
     panel.dataset.cellId = preview.cellId;
     panel.dataset.previewOnly = 'true';
     panel.dataset.serverMutationImplemented = preview.serverMutationImplemented ? 'true' : 'false';
+    panel.dataset.hudInstrument = 'command-preview';
+    bindExpeditionGeneratedHudChrome(panel, 'command-tray');
     panel.title = preview.ariaLabel || `${preview.label} ${preview.cellId}`;
     panel.setAttribute('aria-label', panel.title);
     ['pointerdown', 'pointermove', 'pointerup', 'click', 'wheel'].forEach((eventName) => {
@@ -3578,7 +3632,11 @@
 
     const updateSemanticZoom = appendExpeditionSemanticZoomOverlay(host, renderer, model, cells, selectedCellId);
     const outcomeFeedback = expeditionCommandOutcomeFeedbackForRender(model, cells);
-    state.expeditionMapThreeInfo = renderer.renderExpeditionMap(host, { ...model, cells }, {
+    state.expeditionMapThreeInfo = renderer.renderExpeditionMap(host, {
+      ...model,
+      cells,
+      generatedHudChrome: expeditionGeneratedHudChromeModel(),
+    }, {
       selectedCellId,
       selectedUnitId: state.expeditionSelectedUnitId,
       outcomeFeedback,
@@ -3820,8 +3878,18 @@
       renderer.disposeExpeditionMap(previousThreeHost);
     }
     body.innerHTML = '';
-    body.classList.add('fp-expedition-map-body', 'fp-expedition-map-body--map-first', 'fp-expedition-map-body--hq17b-option1');
-    body.closest('.fp-expedition-map-panel')?.classList.add('fp-expedition-map-panel--hq17b-option1');
+    body.classList.add(
+      'fp-expedition-map-body',
+      'fp-expedition-map-body--map-first',
+      'fp-expedition-map-body--hq17b-option1',
+      'fp-expedition-map-body--hq17c-generated-chrome',
+      'fp-expedition-map-body--hq17d-three-masks',
+    );
+    body.closest('.fp-expedition-map-panel')?.classList.add(
+      'fp-expedition-map-panel--hq17b-option1',
+      'fp-expedition-map-panel--hq17c-generated-chrome',
+      'fp-expedition-map-panel--hq17d-three-masks',
+    );
 
     if (!hasExpeditionMapReadModel(model, bundle)) {
       body.innerHTML = '<p class="fp-helper">Expedition Map fog state is not exposed by the server read model yet.</p>';
@@ -3854,6 +3922,7 @@
     hud.dataset.readOnly = 'true';
     hud.dataset.actions = '0';
     hud.dataset.hudInstrument = 'collapsed-ledger';
+    bindExpeditionGeneratedHudChrome(hud, 'collapsed-ledger');
     runtimeShell.appendChild(hud);
     body.appendChild(runtimeShell);
     appendExpeditionInspectorChrome(hud, model, selectedCell, counts);
@@ -3866,6 +3935,7 @@
     statusCard.dataset.revealed = String(revealedCells.length);
     statusCard.dataset.hidden = String(hiddenCells.length);
     statusCard.dataset.hudInstrument = 'crest-status';
+    bindExpeditionGeneratedHudChrome(statusCard, 'crest-status');
     statusCard.title = `${status}; ${countLabel(revealedCells.length, 'revealed sector')} and ${countLabel(hiddenCells.length, 'hidden silhouette')} from server-owned fog state.`;
     statusCard.setAttribute('aria-label', statusCard.title);
     const title = document.createElement('strong');
@@ -3914,7 +3984,11 @@
     const boardCard = document.createElement('article');
     boardCard.className = 'fp-expedition-map-card fp-expedition-map-card--board';
     boardCard.dataset.testid = 'fp-expedition-map-board-card';
-    boardCard.dataset.hudComposition = 'hq17b_option1_runtime';
+    boardCard.dataset.hudComposition = 'hq17c_generated_chrome_runtime';
+    boardCard.dataset.generatedChromePack = EXPEDITION_GENERATED_HUD_CHROME_PACK_ID;
+    boardCard.dataset.generatedHudMaskLayer = EXPEDITION_GENERATED_HUD_MASK_LAYER_ID;
+    boardCard.dataset.generatedHudCleanComposite = EXPEDITION_GENERATED_HUD_CLEAN_COMPOSITE_ID;
+    boardCard.dataset.generatedHudTextLayer = 'three-canvas';
     const boardTitle = document.createElement('strong');
     boardTitle.textContent = '◎';
     boardTitle.title = 'Zoomable sectors';
@@ -3959,9 +4033,13 @@
     if (objectiveStrip) {
       objectiveStrip.classList.add('fp-expedition-hud-objective');
       objectiveStrip.dataset.hudInstrument = 'objective-loop';
+      bindExpeditionGeneratedHudChrome(objectiveStrip, 'objective-loop');
     }
     const visitSurface = appendExpeditionLocationVisitSurface(boardCard, selectedCell, model);
-    if (visitSurface) visitSurface.dataset.hudInstrument = 'site-context';
+    if (visitSurface) {
+      visitSurface.dataset.hudInstrument = 'site-context';
+      bindExpeditionGeneratedHudChrome(visitSurface, 'selected-context');
+    }
     appendExpeditionMapVisualHud(boardCard, model, counts, selectedCell, scoutableCells, bundle);
     appendExpeditionUnitRoster(boardCard, model, selectedCell);
     runtimeShell.insertBefore(boardCard, hud);

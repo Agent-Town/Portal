@@ -4403,6 +4403,214 @@ html, body {
   left: 28px;
 }
 
+.fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-generated-chrome-frame {
+  background:
+    linear-gradient(135deg, rgba(12, 33, 30, 0.12), rgba(255, 248, 232, 0.08)),
+    var(--fp-generated-hud-chrome) center / 100% 100% no-repeat;
+  border-color: rgba(245, 212, 132, 0.18);
+  box-shadow: none;
+}
+
+.fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-hud-crest {
+  width: min(402px, calc(100% - 454px));
+  min-height: 88px;
+  grid-template-columns: 82px minmax(0, 1fr);
+  padding: 14px 22px 14px 96px;
+  border: 0;
+  color: #fff8e8;
+}
+
+.fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-hud-crest > strong {
+  width: 58px;
+  background: transparent;
+  border-color: transparent;
+}
+
+.fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-hud-crest .fp-expedition-map-status-symbols span {
+  background: rgba(255, 248, 232, 0.12);
+  border-color: rgba(245, 212, 132, 0.20);
+}
+
+.fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-hud-objective {
+  width: min(430px, calc(100% - 474px));
+  min-height: 120px;
+  padding: 20px 18px 14px 70px;
+  border: 0;
+  color: #2e1b0e;
+}
+
+.fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-hud-objective .fp-expedition-guided-loop__step {
+  background: rgba(255, 248, 232, 0.18);
+  border-color: rgba(101, 74, 28, 0.10);
+}
+
+.fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-unit-roster {
+  width: min(650px, calc(100% - 514px));
+  min-height: 152px;
+  padding: 24px 42px 20px 176px;
+  border: 0;
+  color: #2e1b0e;
+}
+
+.fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-unit-roster__head {
+  position: absolute;
+  left: 42px;
+  top: 30px;
+  width: 72px;
+  min-height: 82px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-unit-rail {
+  padding-bottom: 0;
+}
+
+.fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-unit-token {
+  background: rgba(255, 248, 232, 0.10);
+  border-color: rgba(101, 74, 28, 0.14);
+}
+
+.fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-unit-command-bar {
+  padding: 10px 16px;
+  background:
+    linear-gradient(135deg, rgba(12, 33, 30, 0.12), rgba(255, 248, 232, 0.05)),
+    var(--fp-generated-hud-chrome) center / cover no-repeat;
+  border-color: transparent;
+  color: #fff8e8;
+}
+
+.fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-unit-command-bar__button {
+  background:
+    radial-gradient(circle, rgba(245, 212, 132, 0.24), rgba(27, 106, 100, 0.50)),
+    var(--fp-generated-hud-chrome) center / cover no-repeat;
+}
+
+.fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-map-visual-hud,
+.fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-map-selected-summary,
+.fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-location-visit,
+.fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-outpost-status {
+  background:
+    linear-gradient(135deg, rgba(255, 248, 232, 0.10), rgba(12, 33, 30, 0.06)),
+    var(--fp-generated-hud-chrome) center / 100% 100% no-repeat;
+  border-color: transparent;
+}
+
+.fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-ledger-rail {
+  background:
+    linear-gradient(180deg, rgba(12, 33, 30, 0.08), rgba(255, 248, 232, 0.04)),
+    var(--fp-generated-hud-chrome) center / 100% 100% no-repeat;
+  border-color: transparent;
+}
+
+.fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-outpost-status__next-cue,
+.fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-command-preview {
+  background:
+    radial-gradient(circle, rgba(245, 212, 132, 0.24), rgba(27, 106, 100, 0.44)),
+    var(--fp-generated-hud-chrome) center / cover no-repeat;
+  border-color: rgba(245, 212, 132, 0.16);
+}
+
+.fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-semantic-zoom strong {
+  font-size: 0;
+}
+
+.fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-semantic-zoom strong::before {
+  content: "Map";
+  font-size: 11px;
+}
+
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-unit-token {
+  background: rgba(255, 248, 232, 0.04);
+  border-color: rgba(245, 212, 132, 0.08);
+  color: rgba(46, 27, 14, 0.82);
+}
+
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-unit-token:hover,
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-unit-token:focus-visible,
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-unit-token--selected {
+  background: rgba(223, 245, 241, 0.10);
+  border-color: rgba(245, 212, 132, 0.22);
+}
+
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-unit-token__sprite {
+  opacity: 0;
+}
+
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-unit-token__meta {
+  opacity: 0;
+}
+
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-unit-token__ready {
+  background: rgba(255, 248, 232, 0.72);
+}
+
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-unit-command-bar__unit {
+  opacity: 0;
+}
+
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-hud-crest > strong,
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-hud-objective > strong,
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-unit-roster__head strong,
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-unit-roster__head small {
+  opacity: 0;
+}
+
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-hud-crest .fp-expedition-map-status-symbols span,
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-hud-objective .fp-expedition-guided-loop__step strong,
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-hud-objective .fp-expedition-guided-loop__step small,
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-hud-objective .fp-expedition-objective-strip__copy strong,
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-hud-objective .fp-expedition-objective-strip__copy p {
+  color: transparent;
+  opacity: 0;
+  text-shadow: none;
+}
+
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-generated-chrome-frame,
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-hud-crest,
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-hud-objective,
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-unit-roster,
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-map-visual-hud,
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-map-selected-summary,
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-location-visit,
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-outpost-status,
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-ledger-rail {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-unit-command-bar,
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-outpost-status__next-cue,
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-command-preview {
+  background: rgba(12, 33, 30, 0.08);
+  border-color: rgba(245, 212, 132, 0.16);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-unit-command-bar__button {
+  background: rgba(255, 248, 232, 0.18);
+  border-color: rgba(245, 212, 132, 0.22);
+}
+
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-unit-token {
+  background: transparent;
+  border-color: transparent;
+}
+
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-unit-token__ready {
+  opacity: 0;
+}
+
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-unit-token:hover,
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-unit-token:focus-visible,
+.fp-expedition-map-body--hq17d-three-masks .fp-expedition-unit-token--selected {
+  outline: 2px solid rgba(245, 212, 132, 0.46);
+  outline-offset: 2px;
+}
+
 @media (max-width: 1100px) {
   .fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-crest {
     width: min(260px, calc(100% - 112px));
@@ -4625,5 +4833,69 @@ html, body {
 
   .fp-expedition-map-body--hq17b-option1 .fp-expedition-command-outcome {
     bottom: 172px;
+  }
+}
+
+@media (max-width: 900px) {
+  .fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-hud-crest {
+    width: min(286px, calc(100% - 104px));
+    min-height: 74px;
+    padding: 10px 14px 10px 76px;
+  }
+
+  .fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-hud-objective {
+    width: min(390px, calc(100% - 88px));
+    min-height: 96px;
+    padding: 14px 12px 10px 54px;
+  }
+
+  .fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-unit-roster {
+    width: calc(100% - 92px);
+    min-height: 118px;
+    padding: 14px 20px 12px 104px;
+  }
+
+  .fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-unit-roster__head {
+    left: 24px;
+    top: 20px;
+    width: 54px;
+    min-height: 64px;
+  }
+
+  .fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-unit-command-bar {
+    max-width: min(420px, calc(100vw - 82px));
+  }
+}
+
+@media (max-width: 520px) {
+  .fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-hud-crest {
+    left: 56px;
+    width: calc(100% - 104px);
+    min-height: 58px;
+    padding: 8px 10px 8px 52px;
+  }
+
+  .fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-hud-objective {
+    width: calc(100% - 54px);
+    min-height: 76px;
+    padding: 10px 8px 8px 36px;
+  }
+
+  .fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-unit-roster {
+    width: calc(100% - 52px);
+    min-height: 96px;
+    padding: 10px 12px 10px 62px;
+  }
+
+  .fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-unit-roster__head {
+    left: 12px;
+    top: 14px;
+    width: 42px;
+    min-height: 50px;
+  }
+
+  .fp-expedition-map-body--hq17c-generated-chrome .fp-expedition-unit-command-bar {
+    max-width: min(320px, calc(100vw - 64px));
+    padding: 7px 10px;
   }
 }
