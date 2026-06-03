@@ -45,6 +45,7 @@
   const EXPEDITION_GENERATED_HUD_CHROME_PACK_ID = 'hq17c-generated-hud-chrome-v1';
   const EXPEDITION_GENERATED_HUD_MASK_LAYER_ID = 'hq17d_three_masked_profiles_and_text_v1';
   const EXPEDITION_GENERATED_HUD_CLEAN_COMPOSITE_ID = 'hq17e_clean_hud_chrome_compositor_v1';
+  const EXPEDITION_GENERATED_HUD_SINGLE_OWNER_ID = 'hq17f_single_owner_canvas_hud_v1';
   const EXPEDITION_GENERATED_HUD_CHROME_BASE = `${FP_ASSET_BASE}/expedition-map/${EXPEDITION_GENERATED_HUD_CHROME_PACK_ID}`;
   const EXPEDITION_GENERATED_HUD_CHROME_ASSETS = Object.freeze({
     'crest-status': { slot: 'crest-status', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/crest-status.png`, anchor: 'top-left' },
@@ -3884,11 +3885,16 @@
       'fp-expedition-map-body--hq17b-option1',
       'fp-expedition-map-body--hq17c-generated-chrome',
       'fp-expedition-map-body--hq17d-three-masks',
+      'fp-expedition-map-body--hq17f-single-owner-canvas-hud',
     );
+    body.dataset.visibleHudOwner = 'three_canvas';
+    body.dataset.domVisibleHudDemoted = 'true';
+    body.dataset.noVisibleDomHudDuplication = 'true';
     body.closest('.fp-expedition-map-panel')?.classList.add(
       'fp-expedition-map-panel--hq17b-option1',
       'fp-expedition-map-panel--hq17c-generated-chrome',
       'fp-expedition-map-panel--hq17d-three-masks',
+      'fp-expedition-map-panel--hq17f-single-owner-canvas-hud',
     );
 
     if (!hasExpeditionMapReadModel(model, bundle)) {
@@ -3988,7 +3994,11 @@
     boardCard.dataset.generatedChromePack = EXPEDITION_GENERATED_HUD_CHROME_PACK_ID;
     boardCard.dataset.generatedHudMaskLayer = EXPEDITION_GENERATED_HUD_MASK_LAYER_ID;
     boardCard.dataset.generatedHudCleanComposite = EXPEDITION_GENERATED_HUD_CLEAN_COMPOSITE_ID;
+    boardCard.dataset.generatedHudSingleOwner = EXPEDITION_GENERATED_HUD_SINGLE_OWNER_ID;
     boardCard.dataset.generatedHudTextLayer = 'three-canvas';
+    boardCard.dataset.visibleHudOwner = 'three_canvas';
+    boardCard.dataset.domVisibleHudDemoted = 'true';
+    boardCard.dataset.noVisibleDomHudDuplication = 'true';
     const boardTitle = document.createElement('strong');
     boardTitle.textContent = '◎';
     boardTitle.title = 'Zoomable sectors';

@@ -1,17 +1,46 @@
 {
   "ok": true,
   "verdict": "PASS",
-  "title": "HQ17D Three.js masked HUD profiles and text proof",
+  "title": "HQ17F single-owner Three.js/canvas HUD proof",
   "packId": "hq17c-generated-hud-chrome-v1",
   "maskLayer": "hq17d_three_masked_profiles_and_text_v1",
+  "cleanComposite": "hq17e_clean_hud_chrome_compositor_v1",
+  "singleOwner": "hq17f_single_owner_canvas_hud_v1",
+  "visibleHudOwner": "three_canvas",
+  "domVisibleHudDemoted": true,
+  "noVisibleDomHudDuplication": true,
+  "generatedHudTextInThreeLayer": true,
+  "generatedHudProfileMasksInThreeLayer": true,
   "screenshots": [
-    "reports/agent-town-hq17d-three-masked-hud-profiles-desktop-2026-06-03.png",
-    "reports/agent-town-hq17d-three-masked-hud-profiles-mobile-2026-06-03.png"
+    "reports/agent-town-hq17f-single-owner-canvas-hud-desktop-2026-06-03.png",
+    "reports/agent-town-hq17f-single-owner-canvas-hud-mobile-2026-06-03.png"
   ],
+  "commandClick": {
+    "endpoint": "/api/founders-plot/expedition-map/scout-sector",
+    "method": "POST",
+    "payloadKeys": [
+      "actor",
+      "cellId",
+      "idempotencyKey",
+      "plotId"
+    ],
+    "ok": true,
+    "hitLayer": {
+      "display": "flex",
+      "visibility": "visible",
+      "width": 34,
+      "height": 34,
+      "pointerEvents": "auto"
+    },
+    "existingDomTestidPrefix": "fp-btn-scout-sector-unit-command-",
+    "noUnitIdPayload": true,
+    "noTargetCellPayload": true,
+    "noRoutePayload": true
+  },
   "desktop": {
     "viewport": {
       "width": 1280,
-      "height": 720
+      "height": 900
     },
     "documentScrollWidth": 1280,
     "bodyClasses": [
@@ -23,6 +52,9 @@
       "fp-expedition-map-body--hq17d-three-masks",
       "fp-expedition-map-body--hq17f-single-owner-canvas-hud"
     ],
+    "bodyVisibleHudOwner": "three_canvas",
+    "bodyDomVisibleHudDemoted": "true",
+    "bodyNoVisibleDomHudDuplication": "true",
     "panelClasses": [
       "fp-parchment",
       "fp-panel",
@@ -32,123 +64,92 @@
       "fp-expedition-map-panel--hq17d-three-masks",
       "fp-expedition-map-panel--hq17f-single-owner-canvas-hud"
     ],
-    "boardComposition": "hq17c_generated_chrome_runtime",
-    "boardGeneratedChromePack": "hq17c-generated-hud-chrome-v1",
-    "boardMaskLayer": "hq17d_three_masked_profiles_and_text_v1",
-    "boardCleanComposite": "hq17e_clean_hud_chrome_compositor_v1",
-    "boardTextLayer": "three-canvas",
-    "unitButtons": [
-      {
-        "testid": "fp-expedition-unit-token-expedition_unit_pathfinder_scout_v1",
-        "unitId": "expedition_unit_pathfinder_scout_v1",
-        "mask": "three-canvas-circle",
-        "maskLayer": "hq17d_three_masked_profiles_and_text_v1",
-        "visible": true,
-        "rect": {
-          "x": 218,
-          "y": 610,
-          "width": 72,
-          "height": 86,
-          "right": 290,
-          "bottom": 695
-        }
-      },
-      {
-        "testid": "fp-expedition-unit-token-expedition_unit_rook_signalpost_messenger_v1",
-        "unitId": "expedition_unit_rook_signalpost_messenger_v1",
-        "mask": "three-canvas-circle",
-        "maskLayer": "hq17d_three_masked_profiles_and_text_v1",
-        "visible": true,
-        "rect": {
-          "x": 295,
-          "y": 610,
-          "width": 72,
-          "height": 86,
-          "right": 367,
-          "bottom": 695
-        }
-      },
-      {
-        "testid": "fp-expedition-unit-token-expedition_unit_hq_civic_operator_vale_desk_7_v1",
-        "unitId": "expedition_unit_hq_civic_operator_vale_desk_7_v1",
-        "mask": "three-canvas-circle",
-        "maskLayer": "hq17d_three_masked_profiles_and_text_v1",
-        "visible": true,
-        "rect": {
-          "x": 372,
-          "y": 610,
-          "width": 72,
-          "height": 86,
-          "right": 444,
-          "bottom": 695
-        }
-      }
-    ],
+    "board": {
+      "composition": "hq17c_generated_chrome_runtime",
+      "generatedChromePack": "hq17c-generated-hud-chrome-v1",
+      "maskLayer": "hq17d_three_masked_profiles_and_text_v1",
+      "cleanComposite": "hq17e_clean_hud_chrome_compositor_v1",
+      "singleOwner": "hq17f_single_owner_canvas_hud_v1",
+      "textLayer": "three-canvas",
+      "visibleHudOwner": "three_canvas",
+      "domVisibleHudDemoted": "true",
+      "noVisibleDomHudDuplication": "true"
+    },
     "generatedNodes": [
       {
         "testid": "fp-expedition-map-status",
         "slot": "crest-status",
-        "textLayer": "three-canvas",
-        "liveText": "dom",
+        "pack": "hq17c-generated-hud-chrome-v1",
+        "src": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/crest-status.png",
         "cleanComposite": "hq17e_clean_hud_chrome_compositor_v1",
         "visible": true,
-        "text": "◎ ◎ ◆1 □9 LEDGER / FOG"
+        "backgroundImage": "none"
       },
       {
         "testid": "fp-expedition-objective-strip",
         "slot": "objective-loop",
-        "textLayer": "three-canvas",
-        "liveText": "dom",
+        "pack": "hq17c-generated-hud-chrome-v1",
+        "src": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/objective-plaque.png",
         "cleanComposite": "hq17e_clean_hud_chrome_compositor_v1",
         "visible": true,
-        "text": "⌾ ⌖ ⌖ 1 ◆ 1 □ 9 ◉ 3 ◎ ⌖ ⌖ Q1 R0 ✦ ⌖ Scout SCT · Q1 R0 ✓ ⌖ Ready ◇ ⚿ ⚿ Map Q1 R0 ➜ ⌖ Scout Q1 R0 · ◇ DETAILS"
+        "backgroundImage": "none"
       },
       {
         "testid": "fp-expedition-map-visual-hud",
         "slot": "selected-context",
-        "textLayer": "three-canvas",
-        "liveText": "dom",
+        "pack": "hq17c-generated-hud-chrome-v1",
+        "src": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/selected-context-frame.png",
         "cleanComposite": "hq17e_clean_hud_chrome_compositor_v1",
         "visible": true,
-        "text": "◆ 1 ● 0 ◇ 1 □ 8 ◇ ◇ ◇ ◇ ⌖ 1 ⚿ 3 ◉ 1 ⚿ MT RS VD"
+        "backgroundImage": "none"
       },
       {
         "testid": "fp-expedition-map-selected-summary",
         "slot": "selected-context",
-        "textLayer": "three-canvas",
-        "liveText": "dom",
+        "pack": "hq17c-generated-hud-chrome-v1",
+        "src": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/selected-context-frame.png",
         "cleanComposite": "hq17e_clean_hud_chrome_compositor_v1",
         "visible": true,
-        "text": "◇ ◇ ◇ ◇ ⌖ 1 ⚿ 3 ◉ 1 ⚿ MT RS VD"
+        "backgroundImage": "none"
       },
       {
         "testid": "fp-expedition-unit-roster",
         "slot": "unit-dock",
-        "textLayer": "three-canvas",
-        "liveText": "dom",
+        "pack": "hq17c-generated-hud-chrome-v1",
+        "src": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/unit-dock.png",
         "cleanComposite": "hq17e_clean_hud_chrome_compositor_v1",
         "visible": true,
-        "text": "◉ 3 ◉ 1 ✦ ⌖ ⌖ ◆ 1 ⚑ ✉ ◆ 0 ◈ ◉ ◆ 0 ⌖ ⌖ ↦ ⌖ ⌖ ◇ 0 ↦ ↦"
+        "backgroundImage": "none"
       },
       {
         "testid": "fp-expedition-unit-command-bar",
         "slot": "command-puck",
-        "textLayer": "three-canvas",
-        "liveText": "dom",
+        "pack": "hq17c-generated-hud-chrome-v1",
+        "src": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/command-puck.png",
         "cleanComposite": "hq17e_clean_hud_chrome_compositor_v1",
         "visible": true,
-        "text": "⌖ ⌖ ↦ ⌖ ⌖ ◇ 0 ↦ ↦"
+        "backgroundImage": "none"
       },
       {
         "testid": "fp-expedition-map-hud",
         "slot": "collapsed-ledger",
-        "textLayer": "three-canvas",
-        "liveText": "dom",
+        "pack": "hq17c-generated-hud-chrome-v1",
+        "src": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/ledger-rail.png",
         "cleanComposite": "hq17e_clean_hud_chrome_compositor_v1",
         "visible": true,
-        "text": "⌘ Selected details DETAILS Marker details PENDING Fog 9 FOG Aliases ALIAS Revealed 1 RECEIPT"
+        "backgroundImage": "none"
       }
     ],
+    "domCropBackgrounds": [],
+    "chromeSlotsPresent": {
+      "crest-status": true,
+      "objective-loop": true,
+      "unit-dock": true,
+      "command-tray": true,
+      "command-puck": true,
+      "selected-context": true,
+      "collapsed-ledger": true
+    },
     "textSlotsPresent": {
       "crest-status": true,
       "objective-loop": true,
@@ -156,8 +157,196 @@
       "command-puck": true,
       "selected-context": true
     },
-    "primaryTextHasEndpointNames": false,
-    "primaryTextHasProofWords": false,
+    "domHudNodes": [
+      {
+        "selector": "[data-testid=\"fp-expedition-map-status\"]",
+        "present": true,
+        "visible": true,
+        "testid": "fp-expedition-map-status",
+        "hudInstrument": "crest-status",
+        "generatedSlot": "crest-status",
+        "rect": {
+          "x": 102,
+          "y": 136,
+          "width": 402,
+          "height": 88,
+          "right": 504,
+          "bottom": 224
+        },
+        "style": {
+          "display": "grid",
+          "visibility": "visible",
+          "opacity": 1,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "borderTopColor": "rgba(0, 0, 0, 0)",
+          "boxShadow": "none",
+          "color": "rgb(255, 248, 232)"
+        },
+        "paintsPanel": false,
+        "visibleTextChildren": [],
+        "actions": 0,
+        "readOnly": "true"
+      },
+      {
+        "selector": "[data-testid=\"fp-expedition-objective-strip\"]",
+        "present": true,
+        "visible": true,
+        "testid": "fp-expedition-objective-strip",
+        "hudInstrument": "objective-loop",
+        "generatedSlot": "objective-loop",
+        "rect": {
+          "x": 40,
+          "y": 202,
+          "width": 430,
+          "height": 120,
+          "right": 470,
+          "bottom": 322
+        },
+        "style": {
+          "display": "grid",
+          "visibility": "visible",
+          "opacity": 1,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "borderTopColor": "rgba(0, 0, 0, 0)",
+          "boxShadow": "none",
+          "color": "rgb(46, 27, 14)"
+        },
+        "paintsPanel": false,
+        "visibleTextChildren": [],
+        "actions": 0,
+        "readOnly": "true"
+      },
+      {
+        "selector": "[data-testid=\"fp-expedition-unit-roster\"]",
+        "present": true,
+        "visible": true,
+        "testid": "fp-expedition-unit-roster",
+        "hudInstrument": "unit-dock",
+        "generatedSlot": "unit-dock",
+        "rect": {
+          "x": 42,
+          "y": 738,
+          "width": 650,
+          "height": 152,
+          "right": 692,
+          "bottom": 890
+        },
+        "style": {
+          "display": "grid",
+          "visibility": "visible",
+          "opacity": 1,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "borderTopColor": "rgba(0, 0, 0, 0)",
+          "boxShadow": "none",
+          "color": "rgb(46, 27, 14)"
+        },
+        "paintsPanel": false,
+        "visibleTextChildren": [],
+        "actions": 1,
+        "readOnly": "true"
+      },
+      {
+        "selector": "[data-testid=\"fp-expedition-unit-command-bar\"]",
+        "present": true,
+        "visible": true,
+        "testid": "fp-expedition-unit-command-bar",
+        "hudInstrument": "command-puck",
+        "generatedSlot": "command-puck",
+        "rect": {
+          "x": 255,
+          "y": 672,
+          "width": 225,
+          "height": 56,
+          "right": 479,
+          "bottom": 728
+        },
+        "style": {
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": 1,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "borderTopColor": "rgba(0, 0, 0, 0)",
+          "boxShadow": "none",
+          "color": "rgb(255, 248, 232)"
+        },
+        "paintsPanel": false,
+        "visibleTextChildren": [],
+        "actions": 1,
+        "readOnly": "true"
+      },
+      {
+        "selector": "[data-testid=\"fp-expedition-map-visual-hud\"]",
+        "present": true,
+        "visible": true,
+        "testid": "fp-expedition-map-visual-hud",
+        "hudInstrument": "selected-context",
+        "generatedSlot": "selected-context",
+        "rect": {
+          "x": 828,
+          "y": 760,
+          "width": 350,
+          "height": 128,
+          "right": 1178,
+          "bottom": 888
+        },
+        "style": {
+          "display": "grid",
+          "visibility": "visible",
+          "opacity": 1,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "borderTopColor": "rgba(0, 0, 0, 0)",
+          "boxShadow": "none",
+          "color": "rgb(46, 27, 14)"
+        },
+        "paintsPanel": false,
+        "visibleTextChildren": [],
+        "actions": 0,
+        "readOnly": ""
+      },
+      {
+        "selector": "[data-testid=\"fp-expedition-map-hud\"]",
+        "present": true,
+        "visible": true,
+        "testid": "fp-expedition-map-hud",
+        "hudInstrument": "collapsed-ledger",
+        "generatedSlot": "collapsed-ledger",
+        "rect": {
+          "x": 1186,
+          "y": 198,
+          "width": 54,
+          "height": 694,
+          "right": 1240,
+          "bottom": 892
+        },
+        "style": {
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": 1,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "borderTopColor": "rgba(0, 0, 0, 0)",
+          "boxShadow": "none",
+          "color": "rgb(46, 27, 14)"
+        },
+        "paintsPanel": false,
+        "visibleTextChildren": [],
+        "actions": 0,
+        "readOnly": "true"
+      }
+    ],
+    "domPixelOwners": [],
+    "visibleDomHudPaintCount": 0,
+    "visibleDomHudTextCount": 0,
+    "visibleDomHudTextEntries": [],
+    "visibleDuplicateDomHudText": [],
+    "primaryDomTextHasEndpointNames": false,
+    "primaryDomTextHasProofWords": false,
+    "clipped": [],
     "renderer": {
       "visualLayers": {
         "terrainTexture": true,
@@ -342,8 +531,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 270.1599999999999,
-            "y": 53.31999999999998
+            "x": 270.15999999999997,
+            "y": 67.42400000000002
           }
         },
         {
@@ -365,8 +554,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 221.04,
-            "y": 140.12000000000003
+            "x": 221.04000000000005,
+            "y": 177.18400000000008
           }
         },
         {
@@ -389,7 +578,7 @@
           "executableActions": 0,
           "canvas": {
             "x": 349.98,
-            "y": 553.35
+            "y": 699.7199999999999
           }
         },
         {
@@ -412,7 +601,7 @@
           "executableActions": 0,
           "canvas": {
             "x": 998.3639999999999,
-            "y": 557.07
+            "y": 704.424
           }
         },
         {
@@ -435,7 +624,7 @@
           "executableActions": 0,
           "canvas": {
             "x": 1182.564,
-            "y": 297.59999999999997
+            "y": 376.32000000000005
           }
         },
         {
@@ -458,7 +647,7 @@
           "executableActions": 0,
           "canvas": {
             "x": 994.6800000000001,
-            "y": 466.24
+            "y": 589.568
           }
         },
         {
@@ -481,7 +670,7 @@
           "executableActions": 0,
           "canvas": {
             "x": 835.04,
-            "y": 446.4
+            "y": 564.48
           }
         }
       ],
@@ -505,7 +694,7 @@
           "executableActions": 0,
           "canvas": {
             "x": 329.718,
-            "y": 547.305
+            "y": 692.0759999999999
           }
         },
         {
@@ -526,8 +715,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 414.7638536585366,
-            "y": 547.305
+            "x": 427.65100000000007,
+            "y": 692.0759999999999
           }
         },
         {
@@ -548,8 +737,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 499.8097073170732,
-            "y": 547.305
+            "x": 525.5840000000001,
+            "y": 692.0759999999999
           }
         }
       ],
@@ -570,7 +759,7 @@
           "executableActions": 0,
           "canvas": {
             "x": 323.20959999999997,
-            "y": 53.31999999999998
+            "y": 67.42400000000002
           }
         },
         {
@@ -588,8 +777,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 235.776,
-            "y": 140.12000000000003
+            "x": 235.77600000000007,
+            "y": 177.18400000000008
           }
         },
         {
@@ -607,8 +796,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 221.65400000000005,
-            "y": 544.887
+            "x": 221.654,
+            "y": 689.0183999999999
           }
         },
         {
@@ -627,7 +816,7 @@
           "executableActions": 0,
           "canvas": {
             "x": 1067.132,
-            "y": 554.9
+            "y": 701.68
           }
         },
         {
@@ -645,13 +834,196 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 1015.3104000000001,
-            "y": 466.24
+            "x": 1015.3104,
+            "y": 589.568
           }
         }
+      ],
+      "generatedHudCommandSprites": [
+        {
+          "slot": "command-tray",
+          "layerVersion": "hq17f_single_owner_canvas_hud_v1",
+          "commandId": "move_unit",
+          "label": "MOVE",
+          "glyph": "↦",
+          "enabled": false,
+          "liveSource": "server_owned_command_hint",
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "visualOnly": true,
+          "readOnly": true,
+          "selectable": false,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "canvas": {
+            "x": 895.2120000000001,
+            "y": 701.6800000000001
+          }
+        },
+        {
+          "slot": "command-tray",
+          "layerVersion": "hq17f_single_owner_canvas_hud_v1",
+          "commandId": "scout_sector",
+          "label": "SCOUT",
+          "glyph": "⌖",
+          "enabled": true,
+          "liveSource": "server_owned_command_hint",
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "visualOnly": true,
+          "readOnly": true,
+          "selectable": false,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "canvas": {
+            "x": 974.7069411764707,
+            "y": 701.6800000000001
+          }
+        }
+      ],
+      "visibleHudSlots": [
+        {
+          "slot": "crest-status",
+          "owner": "three_canvas",
+          "source": "three_canvas_clean_frame",
+          "sourceCropPainted": false,
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
+          "visualOnly": true,
+          "readOnly": true,
+          "selectable": false,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "noAuthority": true,
+          "canvas": {
+            "x": 270.15999999999997,
+            "y": 67.42400000000002
+          },
+          "viewportContained": true
+        },
+        {
+          "slot": "objective-loop",
+          "owner": "three_canvas",
+          "source": "three_canvas_clean_frame",
+          "sourceCropPainted": false,
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
+          "visualOnly": true,
+          "readOnly": true,
+          "selectable": false,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "noAuthority": true,
+          "canvas": {
+            "x": 221.04000000000005,
+            "y": 177.18400000000008
+          },
+          "viewportContained": true
+        },
+        {
+          "slot": "unit-dock",
+          "owner": "three_canvas",
+          "source": "three_canvas_clean_frame",
+          "sourceCropPainted": false,
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
+          "visualOnly": true,
+          "readOnly": true,
+          "selectable": false,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "noAuthority": true,
+          "canvas": {
+            "x": 349.98,
+            "y": 699.7199999999999
+          },
+          "viewportContained": true
+        },
+        {
+          "slot": "command-tray",
+          "owner": "three_canvas",
+          "source": "three_canvas_clean_frame",
+          "sourceCropPainted": false,
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
+          "visualOnly": true,
+          "readOnly": true,
+          "selectable": false,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "noAuthority": true,
+          "canvas": {
+            "x": 998.3639999999999,
+            "y": 704.424
+          },
+          "viewportContained": true
+        },
+        {
+          "slot": "collapsed-ledger",
+          "owner": "three_canvas",
+          "source": "three_canvas_clean_frame",
+          "sourceCropPainted": false,
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
+          "visualOnly": true,
+          "readOnly": true,
+          "selectable": false,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "noAuthority": true,
+          "canvas": {
+            "x": 1182.564,
+            "y": 376.32000000000005
+          },
+          "viewportContained": true
+        },
+        {
+          "slot": "selected-context",
+          "owner": "three_canvas",
+          "source": "three_canvas_clean_frame",
+          "sourceCropPainted": false,
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
+          "visualOnly": true,
+          "readOnly": true,
+          "selectable": false,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "noAuthority": true,
+          "canvas": {
+            "x": 994.6800000000001,
+            "y": 589.568
+          },
+          "viewportContained": true
+        },
+        {
+          "slot": "command-puck",
+          "owner": "three_canvas",
+          "source": "three_canvas_clean_frame",
+          "sourceCropPainted": false,
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
+          "visualOnly": true,
+          "readOnly": true,
+          "selectable": false,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "noAuthority": true,
+          "canvas": {
+            "x": 835.04,
+            "y": 564.48
+          },
+          "viewportContained": true
+        }
       ]
-    },
-    "clipped": []
+    }
   },
   "mobile": {
     "viewport": {
@@ -668,6 +1040,9 @@
       "fp-expedition-map-body--hq17d-three-masks",
       "fp-expedition-map-body--hq17f-single-owner-canvas-hud"
     ],
+    "bodyVisibleHudOwner": "three_canvas",
+    "bodyDomVisibleHudDemoted": "true",
+    "bodyNoVisibleDomHudDuplication": "true",
     "panelClasses": [
       "fp-parchment",
       "fp-panel",
@@ -677,123 +1052,92 @@
       "fp-expedition-map-panel--hq17d-three-masks",
       "fp-expedition-map-panel--hq17f-single-owner-canvas-hud"
     ],
-    "boardComposition": "hq17c_generated_chrome_runtime",
-    "boardGeneratedChromePack": "hq17c-generated-hud-chrome-v1",
-    "boardMaskLayer": "hq17d_three_masked_profiles_and_text_v1",
-    "boardCleanComposite": "hq17e_clean_hud_chrome_compositor_v1",
-    "boardTextLayer": "three-canvas",
-    "unitButtons": [
-      {
-        "testid": "fp-expedition-unit-token-expedition_unit_pathfinder_scout_v1",
-        "unitId": "expedition_unit_pathfinder_scout_v1",
-        "mask": "three-canvas-circle",
-        "maskLayer": "hq17d_three_masked_profiles_and_text_v1",
-        "visible": true,
-        "rect": {
-          "x": 86,
-          "y": 810,
-          "width": 68,
-          "height": 80,
-          "right": 154,
-          "bottom": 890
-        }
-      },
-      {
-        "testid": "fp-expedition-unit-token-expedition_unit_rook_signalpost_messenger_v1",
-        "unitId": "expedition_unit_rook_signalpost_messenger_v1",
-        "mask": "three-canvas-circle",
-        "maskLayer": "hq17d_three_masked_profiles_and_text_v1",
-        "visible": true,
-        "rect": {
-          "x": 159,
-          "y": 810,
-          "width": 68,
-          "height": 80,
-          "right": 227,
-          "bottom": 890
-        }
-      },
-      {
-        "testid": "fp-expedition-unit-token-expedition_unit_hq_civic_operator_vale_desk_7_v1",
-        "unitId": "expedition_unit_hq_civic_operator_vale_desk_7_v1",
-        "mask": "three-canvas-circle",
-        "maskLayer": "hq17d_three_masked_profiles_and_text_v1",
-        "visible": true,
-        "rect": {
-          "x": 232,
-          "y": 810,
-          "width": 68,
-          "height": 80,
-          "right": 300,
-          "bottom": 890
-        }
-      }
-    ],
+    "board": {
+      "composition": "hq17c_generated_chrome_runtime",
+      "generatedChromePack": "hq17c-generated-hud-chrome-v1",
+      "maskLayer": "hq17d_three_masked_profiles_and_text_v1",
+      "cleanComposite": "hq17e_clean_hud_chrome_compositor_v1",
+      "singleOwner": "hq17f_single_owner_canvas_hud_v1",
+      "textLayer": "three-canvas",
+      "visibleHudOwner": "three_canvas",
+      "domVisibleHudDemoted": "true",
+      "noVisibleDomHudDuplication": "true"
+    },
     "generatedNodes": [
       {
         "testid": "fp-expedition-map-status",
         "slot": "crest-status",
-        "textLayer": "three-canvas",
-        "liveText": "dom",
+        "pack": "hq17c-generated-hud-chrome-v1",
+        "src": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/crest-status.png",
         "cleanComposite": "hq17e_clean_hud_chrome_compositor_v1",
         "visible": true,
-        "text": "◎ ◎ ◆1 □9 LEDGER / FOG"
+        "backgroundImage": "none"
       },
       {
         "testid": "fp-expedition-objective-strip",
         "slot": "objective-loop",
-        "textLayer": "three-canvas",
-        "liveText": "dom",
+        "pack": "hq17c-generated-hud-chrome-v1",
+        "src": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/objective-plaque.png",
         "cleanComposite": "hq17e_clean_hud_chrome_compositor_v1",
         "visible": true,
-        "text": "⌾ ⌖ ⌖ ⌖ ⌖ Scout ⌖ Ready ⚿ Map ⌖ Scout DETAILS"
+        "backgroundImage": "none"
       },
       {
         "testid": "fp-expedition-map-visual-hud",
         "slot": "selected-context",
-        "textLayer": "three-canvas",
-        "liveText": "dom",
+        "pack": "hq17c-generated-hud-chrome-v1",
+        "src": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/selected-context-frame.png",
         "cleanComposite": "hq17e_clean_hud_chrome_compositor_v1",
         "visible": true,
-        "text": "◇ ◇ ◇ ◇ ⌖ 1 ⚿ 3 ◉ 1 ⚿ MT RS VD"
+        "backgroundImage": "none"
       },
       {
         "testid": "fp-expedition-map-selected-summary",
         "slot": "selected-context",
-        "textLayer": "three-canvas",
-        "liveText": "dom",
+        "pack": "hq17c-generated-hud-chrome-v1",
+        "src": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/selected-context-frame.png",
         "cleanComposite": "hq17e_clean_hud_chrome_compositor_v1",
         "visible": true,
-        "text": "◇ ◇ ◇ ◇ ⌖ 1 ⚿ 3 ◉ 1 ⚿ MT RS VD"
+        "backgroundImage": "none"
       },
       {
         "testid": "fp-expedition-unit-roster",
         "slot": "unit-dock",
-        "textLayer": "three-canvas",
-        "liveText": "dom",
+        "pack": "hq17c-generated-hud-chrome-v1",
+        "src": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/unit-dock.png",
         "cleanComposite": "hq17e_clean_hud_chrome_compositor_v1",
         "visible": true,
-        "text": "◉ 3 ◉ 1 ✦ ⌖ ⌖ ◆ 1 ⚑ ✉ ◆ 0 ◈ ◉ ◆ 0 ⌖ ⌖ ↦ ⌖ ⌖ ◇ 0 ↦ ↦"
+        "backgroundImage": "none"
       },
       {
         "testid": "fp-expedition-unit-command-bar",
         "slot": "command-puck",
-        "textLayer": "three-canvas",
-        "liveText": "dom",
+        "pack": "hq17c-generated-hud-chrome-v1",
+        "src": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/command-puck.png",
         "cleanComposite": "hq17e_clean_hud_chrome_compositor_v1",
         "visible": true,
-        "text": "⌖ ⌖ ↦ ⌖ ⌖ ◇ 0 ↦ ↦"
+        "backgroundImage": "none"
       },
       {
         "testid": "fp-expedition-map-hud",
         "slot": "collapsed-ledger",
-        "textLayer": "three-canvas",
-        "liveText": "dom",
+        "pack": "hq17c-generated-hud-chrome-v1",
+        "src": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/ledger-rail.png",
         "cleanComposite": "hq17e_clean_hud_chrome_compositor_v1",
         "visible": true,
-        "text": "⌘ Selected details DETAILS Marker details PENDING Fog 9 FOG Aliases ALIAS Revealed 1 RECEIPT"
+        "backgroundImage": "none"
       }
     ],
+    "domCropBackgrounds": [],
+    "chromeSlotsPresent": {
+      "crest-status": true,
+      "objective-loop": true,
+      "unit-dock": true,
+      "command-tray": true,
+      "command-puck": true,
+      "selected-context": true,
+      "collapsed-ledger": true
+    },
     "textSlotsPresent": {
       "crest-status": true,
       "objective-loop": true,
@@ -801,8 +1145,196 @@
       "command-puck": true,
       "selected-context": true
     },
-    "primaryTextHasEndpointNames": false,
-    "primaryTextHasProofWords": false,
+    "domHudNodes": [
+      {
+        "selector": "[data-testid=\"fp-expedition-map-status\"]",
+        "present": true,
+        "visible": true,
+        "testid": "fp-expedition-map-status",
+        "hudInstrument": "crest-status",
+        "generatedSlot": "crest-status",
+        "rect": {
+          "x": 70,
+          "y": 292,
+          "width": 258,
+          "height": 58,
+          "right": 328,
+          "bottom": 350
+        },
+        "style": {
+          "display": "grid",
+          "visibility": "visible",
+          "opacity": 1,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "borderTopColor": "rgba(0, 0, 0, 0)",
+          "boxShadow": "none",
+          "color": "rgb(255, 248, 232)"
+        },
+        "paintsPanel": false,
+        "visibleTextChildren": [],
+        "actions": 0,
+        "readOnly": "true"
+      },
+      {
+        "selector": "[data-testid=\"fp-expedition-objective-strip\"]",
+        "present": true,
+        "visible": true,
+        "testid": "fp-expedition-objective-strip",
+        "hudInstrument": "objective-loop",
+        "generatedSlot": "objective-loop",
+        "rect": {
+          "x": 24,
+          "y": 344,
+          "width": 308,
+          "height": 77,
+          "right": 332,
+          "bottom": 421
+        },
+        "style": {
+          "display": "grid",
+          "visibility": "visible",
+          "opacity": 1,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "borderTopColor": "rgba(0, 0, 0, 0)",
+          "boxShadow": "none",
+          "color": "rgb(46, 27, 14)"
+        },
+        "paintsPanel": false,
+        "visibleTextChildren": [],
+        "actions": 0,
+        "readOnly": "true"
+      },
+      {
+        "selector": "[data-testid=\"fp-expedition-unit-roster\"]",
+        "present": true,
+        "visible": true,
+        "testid": "fp-expedition-unit-roster",
+        "hudInstrument": "unit-dock",
+        "generatedSlot": "unit-dock",
+        "rect": {
+          "x": 24,
+          "y": 821,
+          "width": 310,
+          "height": 101,
+          "right": 334,
+          "bottom": 922
+        },
+        "style": {
+          "display": "grid",
+          "visibility": "visible",
+          "opacity": 1,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "borderTopColor": "rgba(0, 0, 0, 0)",
+          "boxShadow": "none",
+          "color": "rgb(46, 27, 14)"
+        },
+        "paintsPanel": false,
+        "visibleTextChildren": [],
+        "actions": 1,
+        "readOnly": "true"
+      },
+      {
+        "selector": "[data-testid=\"fp-expedition-unit-command-bar\"]",
+        "present": true,
+        "visible": true,
+        "testid": "fp-expedition-unit-command-bar",
+        "hudInstrument": "command-puck",
+        "generatedSlot": "command-puck",
+        "rect": {
+          "x": 102,
+          "y": 742,
+          "width": 155,
+          "height": 71,
+          "right": 257,
+          "bottom": 813
+        },
+        "style": {
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": 1,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "borderTopColor": "rgba(0, 0, 0, 0)",
+          "boxShadow": "none",
+          "color": "rgb(255, 248, 232)"
+        },
+        "paintsPanel": false,
+        "visibleTextChildren": [],
+        "actions": 1,
+        "readOnly": "true"
+      },
+      {
+        "selector": "[data-testid=\"fp-expedition-map-visual-hud\"]",
+        "present": true,
+        "visible": true,
+        "testid": "fp-expedition-map-visual-hud",
+        "hudInstrument": "selected-context",
+        "generatedSlot": "selected-context",
+        "rect": {
+          "x": 24,
+          "y": 890,
+          "width": 342,
+          "height": 136,
+          "right": 366,
+          "bottom": 1026
+        },
+        "style": {
+          "display": "grid",
+          "visibility": "visible",
+          "opacity": 1,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "borderTopColor": "rgba(0, 0, 0, 0)",
+          "boxShadow": "none",
+          "color": "rgb(46, 27, 14)"
+        },
+        "paintsPanel": false,
+        "visibleTextChildren": [],
+        "actions": 0,
+        "readOnly": ""
+      },
+      {
+        "selector": "[data-testid=\"fp-expedition-map-hud\"]",
+        "present": true,
+        "visible": true,
+        "testid": "fp-expedition-map-hud",
+        "hudInstrument": "collapsed-ledger",
+        "generatedSlot": "collapsed-ledger",
+        "rect": {
+          "x": 324,
+          "y": 386,
+          "width": 42,
+          "height": 120,
+          "right": 366,
+          "bottom": 506
+        },
+        "style": {
+          "display": "flex",
+          "visibility": "visible",
+          "opacity": 1,
+          "backgroundImage": "none",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "borderTopColor": "rgba(0, 0, 0, 0)",
+          "boxShadow": "none",
+          "color": "rgb(46, 27, 14)"
+        },
+        "paintsPanel": false,
+        "visibleTextChildren": [],
+        "actions": 0,
+        "readOnly": "true"
+      }
+    ],
+    "domPixelOwners": [],
+    "visibleDomHudPaintCount": 0,
+    "visibleDomHudTextCount": 0,
+    "visibleDomHudTextEntries": [],
+    "visibleDuplicateDomHudText": [],
+    "primaryDomTextHasEndpointNames": false,
+    "primaryDomTextHasProofWords": false,
+    "clipped": [],
     "renderer": {
       "visualLayers": {
         "terrainTexture": true,
@@ -1294,27 +1826,209 @@
             "y": 565.504
           }
         }
+      ],
+      "generatedHudCommandSprites": [
+        {
+          "slot": "command-tray",
+          "layerVersion": "hq17f_single_owner_canvas_hud_v1",
+          "commandId": "move_unit",
+          "label": "MOVE",
+          "glyph": "↦",
+          "enabled": false,
+          "liveSource": "server_owned_command_hint",
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "visualOnly": true,
+          "readOnly": true,
+          "selectable": false,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "canvas": {
+            "x": 263.898,
+            "y": 673.04
+          }
+        },
+        {
+          "slot": "command-tray",
+          "layerVersion": "hq17f_single_owner_canvas_hud_v1",
+          "commandId": "scout_sector",
+          "label": "SCOUT",
+          "glyph": "⌖",
+          "enabled": true,
+          "liveSource": "server_owned_command_hint",
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "visualOnly": true,
+          "readOnly": true,
+          "selectable": false,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "canvas": {
+            "x": 287.33217647058825,
+            "y": 673.04
+          }
+        }
+      ],
+      "visibleHudSlots": [
+        {
+          "slot": "crest-status",
+          "owner": "three_canvas",
+          "source": "three_canvas_clean_frame",
+          "sourceCropPainted": false,
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
+          "visualOnly": true,
+          "readOnly": true,
+          "selectable": false,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "noAuthority": true,
+          "canvas": {
+            "x": 79.63999999999999,
+            "y": 64.67199999999997
+          },
+          "viewportContained": true
+        },
+        {
+          "slot": "objective-loop",
+          "owner": "three_canvas",
+          "source": "three_canvas_clean_frame",
+          "sourceCropPainted": false,
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
+          "visualOnly": true,
+          "readOnly": true,
+          "selectable": false,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "noAuthority": true,
+          "canvas": {
+            "x": 65.16000000000001,
+            "y": 169.95200000000003
+          },
+          "viewportContained": true
+        },
+        {
+          "slot": "unit-dock",
+          "owner": "three_canvas",
+          "source": "three_canvas_clean_frame",
+          "sourceCropPainted": false,
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
+          "visualOnly": true,
+          "readOnly": true,
+          "selectable": false,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "noAuthority": true,
+          "canvas": {
+            "x": 103.17000000000002,
+            "y": 671.16
+          },
+          "viewportContained": true
+        },
+        {
+          "slot": "command-tray",
+          "owner": "three_canvas",
+          "source": "three_canvas_clean_frame",
+          "sourceCropPainted": false,
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
+          "visualOnly": true,
+          "readOnly": true,
+          "selectable": false,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "noAuthority": true,
+          "canvas": {
+            "x": 294.306,
+            "y": 675.672
+          },
+          "viewportContained": true
+        },
+        {
+          "slot": "collapsed-ledger",
+          "owner": "three_canvas",
+          "source": "three_canvas_clean_frame",
+          "sourceCropPainted": false,
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
+          "visualOnly": true,
+          "readOnly": true,
+          "selectable": false,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "noAuthority": true,
+          "canvas": {
+            "x": 348.60600000000005,
+            "y": 360.9600000000001
+          },
+          "viewportContained": true
+        },
+        {
+          "slot": "selected-context",
+          "owner": "three_canvas",
+          "source": "three_canvas_clean_frame",
+          "sourceCropPainted": false,
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
+          "visualOnly": true,
+          "readOnly": true,
+          "selectable": false,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "noAuthority": true,
+          "canvas": {
+            "x": 293.22,
+            "y": 565.504
+          },
+          "viewportContained": true
+        },
+        {
+          "slot": "command-puck",
+          "owner": "three_canvas",
+          "source": "three_canvas_clean_frame",
+          "sourceCropPainted": false,
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
+          "visualOnly": true,
+          "readOnly": true,
+          "selectable": false,
+          "routeAuthority": false,
+          "actionAuthority": false,
+          "executableActions": 0,
+          "noAuthority": true,
+          "canvas": {
+            "x": 246.15999999999997,
+            "y": 541.4399999999999
+          },
+          "viewportContained": true
+        }
       ]
-    },
-    "clipped": []
+    }
   },
   "guardrails": {
-    "generatedChromePackRetained": true,
-    "generatedChromeCleanComposite": true,
+    "visibleHudOwner": "three_canvas",
+    "domVisibleHudDemoted": true,
+    "noVisibleDomHudDuplication": true,
+    "visibleDomHudPaintCount": 0,
+    "visibleDomHudTextCount": 0,
+    "generatedHudTextInThreeLayer": true,
+    "generatedHudProfileMasksInThreeLayer": true,
+    "generatedHudCommandGlyphsInThreeLayer": true,
+    "generatedHudCommandGlyphsNoAuthority": true,
     "sourceCropsNotPainted": true,
-    "profileMasksInThreeLayer": true,
-    "profileMasksVisualOnly": true,
-    "profileMasksReadOnly": true,
-    "profileMasksNoAuthority": true,
-    "profileMasksNotSelectable": true,
-    "hudTextInThreeLayer": true,
-    "hudTextVisualOnly": true,
-    "hudTextReadOnly": true,
-    "hudTextNoAuthority": true,
-    "domA11yAndClickLayerRetained": true,
     "primaryHudNoEndpointNames": true,
     "primaryHudNoProofProse": true,
     "noMobileHorizontalOverflow": true,
+    "existingDomCommandHandlersRetained": true,
+    "existingDomCommandPayloadShapeRetained": true,
     "noServerRouteToolStoreSchemaAuthorityChange": true,
     "noGameplayMutationAdded": true,
     "noAtlasExecution": true,

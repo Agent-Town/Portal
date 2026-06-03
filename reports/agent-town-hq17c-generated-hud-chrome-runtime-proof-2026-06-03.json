@@ -20,7 +20,8 @@
       "fp-expedition-map-body--map-first",
       "fp-expedition-map-body--hq17b-option1",
       "fp-expedition-map-body--hq17c-generated-chrome",
-      "fp-expedition-map-body--hq17d-three-masks"
+      "fp-expedition-map-body--hq17d-three-masks",
+      "fp-expedition-map-body--hq17f-single-owner-canvas-hud"
     ],
     "panelClasses": [
       "fp-parchment",
@@ -28,7 +29,8 @@
       "fp-expedition-map-panel",
       "fp-expedition-map-panel--hq17b-option1",
       "fp-expedition-map-panel--hq17c-generated-chrome",
-      "fp-expedition-map-panel--hq17d-three-masks"
+      "fp-expedition-map-panel--hq17d-three-masks",
+      "fp-expedition-map-panel--hq17f-single-owner-canvas-hud"
     ],
     "boardComposition": "hq17c_generated_chrome_runtime",
     "boardGeneratedChromePack": "hq17c-generated-hud-chrome-v1",
@@ -213,6 +215,24 @@
         "generatedSpriteAssetsReady": 8,
         "generatedSpriteAssetsVisualOnly": true,
         "generatedSpriteAssetsReadOnly": true,
+        "singleVisibleHudOwner": true,
+        "visibleHudOwner": "three_canvas",
+        "visibleHudOwnerVersion": "hq17f_single_owner_canvas_hud_v1",
+        "domVisibleHudDemoted": true,
+        "domHudRole": "transparent_hit_a11y_layer",
+        "domHudHitLayerRetained": true,
+        "domHudHitLayerPainted": false,
+        "visibleDomHudPaintCount": 0,
+        "visibleDomHudTextCount": 0,
+        "noVisibleDomHudDuplication": true,
+        "rendererNetworkRequests": 0,
+        "rendererMutationHandlers": [],
+        "threeCanvasHudOwnsChrome": true,
+        "threeCanvasHudOwnsProfiles": true,
+        "threeCanvasHudOwnsText": true,
+        "threeCanvasHudOwnsCommandTray": true,
+        "threeCanvasHudOwnsCollapsedLedgerHint": true,
+        "threeCanvasHudNoGameplayAuthority": true,
         "generatedHudChrome": true,
         "generatedHudChromeInThreeLayer": true,
         "generatedHudChromeAssetPack": "hq17c-generated-hud-chrome-v1",
@@ -221,6 +241,22 @@
         "generatedHudChromeAssetsReady": 7,
         "generatedHudChromeCleanComposite": true,
         "generatedHudChromeCleanCompositeVersion": "hq17e_clean_hud_chrome_compositor_v1",
+        "generatedHudMaterialityPass": true,
+        "generatedHudMaterialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+        "generatedHudMaterialityRendererOwned": true,
+        "generatedHudMaterialitySource": "procedural_canvas_textures",
+        "generatedHudMaterialityProfiles": true,
+        "generatedHudMaterialityText": true,
+        "generatedHudMaterialityCommands": true,
+        "generatedHudMaterialityChromeSlots": [
+          "crest-status",
+          "objective-loop",
+          "unit-dock",
+          "command-tray",
+          "collapsed-ledger",
+          "selected-context",
+          "command-puck"
+        ],
         "generatedHudChromeSourcePackRetained": true,
         "generatedHudChromePaintedSourceCrops": false,
         "generatedHudChromeSpritesVisualOnly": true,
@@ -245,6 +281,13 @@
         "generatedHudTextSpritesReadOnly": true,
         "generatedHudTextSpritesSelectable": false,
         "generatedHudTextAuthority": false,
+        "generatedHudCommandGlyphsInThreeLayer": true,
+        "generatedHudCommandGlyphSpriteCount": 2,
+        "generatedHudCommandGlyphLiveSource": "server_owned_command_hint",
+        "generatedHudCommandGlyphsVisualOnly": true,
+        "generatedHudCommandGlyphsReadOnly": true,
+        "generatedHudCommandGlyphsSelectable": false,
+        "generatedHudCommandGlyphAuthority": false,
         "serverTerrainAssetContractVersion": "agenttown_public_terrain_asset_slots_v1",
         "serverTerrainSlotSource": "server_read_model_v1",
         "assetBackedRegionTiles": 10,
@@ -331,6 +374,8 @@
           "anchor": "top-left",
           "assetReady": true,
           "cleanCompositeVersion": "hq17e_clean_hud_chrome_compositor_v1",
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
           "chromeSource": "three_canvas_clean_frame",
           "sourceAssetPath": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/crest-status.png",
           "liveTextSource": "dom",
@@ -341,8 +386,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 276.2999999999999,
-            "y": 57.65999999999998
+            "x": 270.1599999999999,
+            "y": 53.31999999999998
           }
         },
         {
@@ -352,6 +397,8 @@
           "anchor": "top-left",
           "assetReady": true,
           "cleanCompositeVersion": "hq17e_clean_hud_chrome_compositor_v1",
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
           "chromeSource": "three_canvas_clean_frame",
           "sourceAssetPath": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/objective-plaque.png",
           "liveTextSource": "dom",
@@ -362,8 +409,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 235.776,
-            "y": 148.79999999999995
+            "x": 221.04,
+            "y": 140.12000000000003
           }
         },
         {
@@ -373,6 +420,8 @@
           "anchor": "bottom-left",
           "assetReady": true,
           "cleanCompositeVersion": "hq17e_clean_hud_chrome_compositor_v1",
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
           "chromeSource": "three_canvas_clean_frame",
           "sourceAssetPath": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/unit-dock.png",
           "liveTextSource": "dom",
@@ -383,8 +432,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 334.016,
-            "y": 551.8
+            "x": 349.98,
+            "y": 553.35
           }
         },
         {
@@ -394,6 +443,8 @@
           "anchor": "bottom-right",
           "assetReady": true,
           "cleanCompositeVersion": "hq17e_clean_hud_chrome_compositor_v1",
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
           "chromeSource": "three_canvas_clean_frame",
           "sourceAssetPath": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/command-tray.png",
           "liveTextSource": "dom",
@@ -404,8 +455,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 1002.0479999999999,
-            "y": 553.04
+            "x": 998.3639999999999,
+            "y": 557.07
           }
         },
         {
@@ -415,6 +466,8 @@
           "anchor": "right",
           "assetReady": true,
           "cleanCompositeVersion": "hq17e_clean_hud_chrome_compositor_v1",
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
           "chromeSource": "three_canvas_clean_frame",
           "sourceAssetPath": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/ledger-rail.png",
           "liveTextSource": "dom",
@@ -425,7 +478,7 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 1175.81,
+            "x": 1182.564,
             "y": 297.59999999999997
           }
         },
@@ -436,6 +489,8 @@
           "anchor": "bottom-right",
           "assetReady": true,
           "cleanCompositeVersion": "hq17e_clean_hud_chrome_compositor_v1",
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
           "chromeSource": "three_canvas_clean_frame",
           "sourceAssetPath": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/selected-context-frame.png",
           "liveTextSource": "dom",
@@ -446,8 +501,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 998.3639999999999,
-            "y": 452.59999999999997
+            "x": 994.6800000000001,
+            "y": 466.24
           }
         },
         {
@@ -457,6 +512,8 @@
           "anchor": "selected-command",
           "assetReady": true,
           "cleanCompositeVersion": "hq17e_clean_hud_chrome_compositor_v1",
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
           "chromeSource": "three_canvas_clean_frame",
           "sourceAssetPath": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/command-puck.png",
           "liveTextSource": "dom",
@@ -487,7 +544,8 @@
       "fp-expedition-map-body--map-first",
       "fp-expedition-map-body--hq17b-option1",
       "fp-expedition-map-body--hq17c-generated-chrome",
-      "fp-expedition-map-body--hq17d-three-masks"
+      "fp-expedition-map-body--hq17d-three-masks",
+      "fp-expedition-map-body--hq17f-single-owner-canvas-hud"
     ],
     "panelClasses": [
       "fp-parchment",
@@ -495,7 +553,8 @@
       "fp-expedition-map-panel",
       "fp-expedition-map-panel--hq17b-option1",
       "fp-expedition-map-panel--hq17c-generated-chrome",
-      "fp-expedition-map-panel--hq17d-three-masks"
+      "fp-expedition-map-panel--hq17d-three-masks",
+      "fp-expedition-map-panel--hq17f-single-owner-canvas-hud"
     ],
     "boardComposition": "hq17c_generated_chrome_runtime",
     "boardGeneratedChromePack": "hq17c-generated-hud-chrome-v1",
@@ -680,6 +739,24 @@
         "generatedSpriteAssetsReady": 8,
         "generatedSpriteAssetsVisualOnly": true,
         "generatedSpriteAssetsReadOnly": true,
+        "singleVisibleHudOwner": true,
+        "visibleHudOwner": "three_canvas",
+        "visibleHudOwnerVersion": "hq17f_single_owner_canvas_hud_v1",
+        "domVisibleHudDemoted": true,
+        "domHudRole": "transparent_hit_a11y_layer",
+        "domHudHitLayerRetained": true,
+        "domHudHitLayerPainted": false,
+        "visibleDomHudPaintCount": 0,
+        "visibleDomHudTextCount": 0,
+        "noVisibleDomHudDuplication": true,
+        "rendererNetworkRequests": 0,
+        "rendererMutationHandlers": [],
+        "threeCanvasHudOwnsChrome": true,
+        "threeCanvasHudOwnsProfiles": true,
+        "threeCanvasHudOwnsText": true,
+        "threeCanvasHudOwnsCommandTray": true,
+        "threeCanvasHudOwnsCollapsedLedgerHint": true,
+        "threeCanvasHudNoGameplayAuthority": true,
         "generatedHudChrome": true,
         "generatedHudChromeInThreeLayer": true,
         "generatedHudChromeAssetPack": "hq17c-generated-hud-chrome-v1",
@@ -688,6 +765,22 @@
         "generatedHudChromeAssetsReady": 7,
         "generatedHudChromeCleanComposite": true,
         "generatedHudChromeCleanCompositeVersion": "hq17e_clean_hud_chrome_compositor_v1",
+        "generatedHudMaterialityPass": true,
+        "generatedHudMaterialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+        "generatedHudMaterialityRendererOwned": true,
+        "generatedHudMaterialitySource": "procedural_canvas_textures",
+        "generatedHudMaterialityProfiles": true,
+        "generatedHudMaterialityText": true,
+        "generatedHudMaterialityCommands": true,
+        "generatedHudMaterialityChromeSlots": [
+          "crest-status",
+          "objective-loop",
+          "unit-dock",
+          "command-tray",
+          "collapsed-ledger",
+          "selected-context",
+          "command-puck"
+        ],
         "generatedHudChromeSourcePackRetained": true,
         "generatedHudChromePaintedSourceCrops": false,
         "generatedHudChromeSpritesVisualOnly": true,
@@ -712,6 +805,13 @@
         "generatedHudTextSpritesReadOnly": true,
         "generatedHudTextSpritesSelectable": false,
         "generatedHudTextAuthority": false,
+        "generatedHudCommandGlyphsInThreeLayer": true,
+        "generatedHudCommandGlyphSpriteCount": 2,
+        "generatedHudCommandGlyphLiveSource": "server_owned_command_hint",
+        "generatedHudCommandGlyphsVisualOnly": true,
+        "generatedHudCommandGlyphsReadOnly": true,
+        "generatedHudCommandGlyphsSelectable": false,
+        "generatedHudCommandGlyphAuthority": false,
         "serverTerrainAssetContractVersion": "agenttown_public_terrain_asset_slots_v1",
         "serverTerrainSlotSource": "server_read_model_v1",
         "assetBackedRegionTiles": 10,
@@ -798,6 +898,8 @@
           "anchor": "top-left",
           "assetReady": true,
           "cleanCompositeVersion": "hq17e_clean_hud_chrome_compositor_v1",
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
           "chromeSource": "three_canvas_clean_frame",
           "sourceAssetPath": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/crest-status.png",
           "liveTextSource": "dom",
@@ -808,8 +910,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 81.44999999999999,
-            "y": 69.93599999999998
+            "x": 79.63999999999999,
+            "y": 64.67199999999997
           }
         },
         {
@@ -819,6 +921,8 @@
           "anchor": "top-left",
           "assetReady": true,
           "cleanCompositeVersion": "hq17e_clean_hud_chrome_compositor_v1",
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
           "chromeSource": "three_canvas_clean_frame",
           "sourceAssetPath": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/objective-plaque.png",
           "liveTextSource": "dom",
@@ -829,8 +933,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 69.504,
-            "y": 180.48
+            "x": 65.16000000000001,
+            "y": 169.95200000000003
           }
         },
         {
@@ -840,6 +944,8 @@
           "anchor": "bottom-left",
           "assetReady": true,
           "cleanCompositeVersion": "hq17e_clean_hud_chrome_compositor_v1",
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
           "chromeSource": "three_canvas_clean_frame",
           "sourceAssetPath": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/unit-dock.png",
           "liveTextSource": "dom",
@@ -850,8 +956,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 98.46400000000001,
-            "y": 669.28
+            "x": 103.17000000000002,
+            "y": 671.16
           }
         },
         {
@@ -861,6 +967,8 @@
           "anchor": "bottom-right",
           "assetReady": true,
           "cleanCompositeVersion": "hq17e_clean_hud_chrome_compositor_v1",
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
           "chromeSource": "three_canvas_clean_frame",
           "sourceAssetPath": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/command-tray.png",
           "liveTextSource": "dom",
@@ -871,8 +979,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 295.392,
-            "y": 670.7839999999999
+            "x": 294.306,
+            "y": 675.672
           }
         },
         {
@@ -882,6 +990,8 @@
           "anchor": "right",
           "assetReady": true,
           "cleanCompositeVersion": "hq17e_clean_hud_chrome_compositor_v1",
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
           "chromeSource": "three_canvas_clean_frame",
           "sourceAssetPath": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/ledger-rail.png",
           "liveTextSource": "dom",
@@ -892,8 +1002,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 346.615,
-            "y": 360.96000000000004
+            "x": 348.60600000000005,
+            "y": 360.9600000000001
           }
         },
         {
@@ -903,6 +1013,8 @@
           "anchor": "bottom-right",
           "assetReady": true,
           "cleanCompositeVersion": "hq17e_clean_hud_chrome_compositor_v1",
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
           "chromeSource": "three_canvas_clean_frame",
           "sourceAssetPath": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/selected-context-frame.png",
           "liveTextSource": "dom",
@@ -913,8 +1025,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 294.306,
-            "y": 548.96
+            "x": 293.22,
+            "y": 565.504
           }
         },
         {
@@ -924,6 +1036,8 @@
           "anchor": "selected-command",
           "assetReady": true,
           "cleanCompositeVersion": "hq17e_clean_hud_chrome_compositor_v1",
+          "materialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+          "materialProfile": "procedural_beveled_metal_parchment_frame",
           "chromeSource": "three_canvas_clean_frame",
           "sourceAssetPath": "/experiences/founders-plot/assets/expedition-map/hq17c-generated-hud-chrome-v1/command-puck.png",
           "liveTextSource": "dom",

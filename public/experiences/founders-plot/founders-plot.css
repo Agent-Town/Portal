@@ -4611,6 +4611,99 @@ html, body {
   outline-offset: 2px;
 }
 
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-hud-crest,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-hud-objective,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-map-visual-hud,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-map-selected-summary,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-unit-roster,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-location-visit,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-outpost-status,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-outpost-status__next-cue,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-ledger-rail,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-unit-command-bar {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-hud-crest::before,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-hud-crest::after,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-hud-objective::before,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-hud-objective::after,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-map-visual-hud::before,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-map-visual-hud::after,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-unit-roster::before,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-unit-roster::after,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-ledger-rail::before,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-ledger-rail::after {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  color: transparent !important;
+  text-shadow: none !important;
+}
+
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-hud-crest :where(strong, small, span, p, b, i, em),
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-hud-objective :where(strong, small, span, p, b, i, em),
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-map-visual-hud :where(strong, small, span, p, b, i, em),
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-map-selected-summary :where(strong, small, span, p, b, i, em),
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-unit-roster :where(strong, small, span, p, b, i, em),
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-location-visit :where(strong, small, span, p, b, i, em),
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-outpost-status :where(strong, small, span, p, b, i, em),
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-ledger-rail :where(strong, small, span, p, b, i, em),
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-unit-command-bar :where(button, span, small),
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-unit-command-bar__button {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  color: transparent !important;
+  text-shadow: none !important;
+}
+
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-unit-token,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-unit-token:hover,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-unit-token--selected,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-unit-command-bar__button,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-unit-command-bar__button:hover {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  color: transparent !important;
+  text-shadow: none !important;
+}
+
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-unit-token > *,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-unit-command-chip,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-map-status-symbols > *,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-guided-loop__step > *,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-objective-strip__copy > *,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-inspector-drawer__chrome > * {
+  opacity: 0 !important;
+}
+
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-unit-token:focus-visible,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-unit-command-bar__button:focus-visible {
+  outline: 2px solid rgba(245, 212, 132, 0.58);
+  outline-offset: 2px;
+}
+
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-unit-token {
+  min-width: 64px;
+  min-height: 58px;
+  pointer-events: auto;
+}
+
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-unit-command-bar__button {
+  display: inline-flex !important;
+  flex: 0 0 34px !important;
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+  pointer-events: auto;
+}
+
 @media (max-width: 1100px) {
   .fp-expedition-map-body--hq17b-option1 .fp-expedition-hud-crest {
     width: min(260px, calc(100% - 112px));

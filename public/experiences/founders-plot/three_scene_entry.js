@@ -1356,6 +1356,8 @@ const EXPEDITION_GENERATED_HUD_CHROME_PACK_ID = 'hq17c-generated-hud-chrome-v1';
 const EXPEDITION_GENERATED_HUD_CHROME_BASE = `${EXPEDITION_REGION_ASSET_BASE}/${EXPEDITION_GENERATED_HUD_CHROME_PACK_ID}`;
 const EXPEDITION_GENERATED_HUD_MASK_LAYER_VERSION = 'hq17d_three_masked_profiles_and_text_v1';
 const EXPEDITION_GENERATED_HUD_CLEAN_COMPOSITE_VERSION = 'hq17e_clean_hud_chrome_compositor_v1';
+const EXPEDITION_GENERATED_HUD_SINGLE_OWNER_VERSION = 'hq17f_single_owner_canvas_hud_v1';
+const EXPEDITION_GENERATED_HUD_MATERIALITY_VERSION = 'hq17g_renderer_owned_hud_materiality_v1';
 const EXPEDITION_PUBLIC_TERRAIN_CONTRACT_VERSION = 'agenttown_public_terrain_asset_slots_v1';
 const EXPEDITION_PUBLIC_TERRAIN_SLOT_SOURCE = 'server_read_model_v1';
 const EXPEDITION_ALLOWED_PUBLIC_TERRAIN_SLOTS = Object.freeze(['field', 'forest', 'ridge', 'settled']);
@@ -1412,13 +1414,13 @@ const EXPEDITION_MARKER_SPRITE_ASSETS = Object.freeze({
   receipt_ledger: { slot: 'receipt_ledger', path: `${EXPEDITION_SPRITE_ASSET_BASE}/receipt-ledger-v1.png`, assetKind: 'generated_marker_sprite' }
 });
 const EXPEDITION_GENERATED_HUD_CHROME_ASSETS = Object.freeze([
-  { slot: 'crest-status', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/crest-status.png`, anchor: 'top-left', widthRatio: 0.42, heightRatio: 0.15, marginX: 0.015, marginY: 0.018, opacity: 0.36 },
-  { slot: 'objective-loop', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/objective-plaque.png`, anchor: 'top-left', widthRatio: 0.32, heightRatio: 0.13, marginX: 0.032, marginY: 0.175, opacity: 0.32 },
-  { slot: 'unit-dock', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/unit-dock.png`, anchor: 'bottom-left', widthRatio: 0.52, heightRatio: 0.19, marginX: 0.012, marginY: 0.015, opacity: 0.36 },
-  { slot: 'command-tray', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/command-tray.png`, anchor: 'bottom-right', widthRatio: 0.34, heightRatio: 0.18, marginX: 0.014, marginY: 0.018, opacity: 0.34 },
-  { slot: 'collapsed-ledger', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/ledger-rail.png`, anchor: 'right', widthRatio: 0.065, heightRatio: 0.58, marginX: 0.010, marginY: 0.19, opacity: 0.36 },
-  { slot: 'selected-context', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/selected-context-frame.png`, anchor: 'bottom-right', widthRatio: 0.27, heightRatio: 0.13, marginX: 0.052, marginY: 0.205, opacity: 0.30 },
-  { slot: 'command-puck', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/command-puck.png`, anchor: 'selected-command', widthRatio: 0.075, heightRatio: 0.11, marginX: 0, marginY: 0, opacity: 0.36 }
+  { slot: 'crest-status', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/crest-status.png`, anchor: 'top-left', widthRatio: 0.36, heightRatio: 0.14, marginX: 0.040, marginY: 0.016, opacity: 0.58 },
+  { slot: 'objective-loop', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/objective-plaque.png`, anchor: 'top-left', widthRatio: 0.30, heightRatio: 0.12, marginX: 0.030, marginY: 0.166, opacity: 0.54 },
+  { slot: 'unit-dock', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/unit-dock.png`, anchor: 'bottom-left', widthRatio: 0.55, heightRatio: 0.195, marginX: 0.010, marginY: 0.010, opacity: 0.62 },
+  { slot: 'command-tray', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/command-tray.png`, anchor: 'bottom-right', widthRatio: 0.35, heightRatio: 0.175, marginX: 0.012, marginY: 0.014, opacity: 0.62 },
+  { slot: 'collapsed-ledger', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/ledger-rail.png`, anchor: 'right', widthRatio: 0.058, heightRatio: 0.56, marginX: 0.008, marginY: 0.20, opacity: 0.58 },
+  { slot: 'selected-context', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/selected-context-frame.png`, anchor: 'bottom-right', widthRatio: 0.28, heightRatio: 0.12, marginX: 0.050, marginY: 0.188, opacity: 0.56 },
+  { slot: 'command-puck', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/command-puck.png`, anchor: 'selected-command', widthRatio: 0.070, heightRatio: 0.102, marginX: 0, marginY: 0, opacity: 0.60 }
 ]);
 const expeditionRegionTileImages = new Map();
 const expeditionRegionTileListeners = new Set();
@@ -3379,7 +3381,7 @@ function expeditionHudUnitLabel(unit = {}) {
 function makeExpeditionGeneratedHudProfileTexture(unit = {}, selected = false) {
   const spriteAsset = expeditionUnitSpriteAsset(unit);
   const spriteReady = !!expeditionRegionTileReady(spriteAsset);
-  const key = `expedition-hud-profile:${EXPEDITION_GENERATED_HUD_MASK_LAYER_VERSION}:${unit.unitId}:${unit.unitType}:${spriteReady ? 'asset' : 'fallback'}:${selected ? 'selected' : 'idle'}`;
+  const key = `expedition-hud-profile:${EXPEDITION_GENERATED_HUD_MATERIALITY_VERSION}:${unit.unitId}:${unit.unitType}:${spriteReady ? 'asset' : 'fallback'}:${selected ? 'selected' : 'idle'}`;
   if (textureCache.has(key)) return textureCache.get(key);
   const canvas = document.createElement('canvas');
   canvas.width = 256;
@@ -3388,33 +3390,34 @@ function makeExpeditionGeneratedHudProfileTexture(unit = {}, selected = false) {
   const style = expeditionUnitStyle(unit);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  ctx.fillStyle = 'rgba(12, 33, 30, 0.36)';
+  ctx.fillStyle = 'rgba(4, 16, 15, 0.42)';
   ctx.beginPath();
-  ctx.ellipse(128, 210, 74, 19, 0, 0, Math.PI * 2);
+  ctx.ellipse(128, 214, 78, 20, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  const outer = ctx.createRadialGradient(92, 62, 12, 128, 128, 118);
+  const outer = ctx.createRadialGradient(88, 54, 10, 128, 126, 118);
   outer.addColorStop(0, 'rgba(255, 248, 232, 0.96)');
-  outer.addColorStop(0.52, selected ? 'rgba(245, 212, 132, 0.92)' : 'rgba(130, 214, 208, 0.70)');
-  outer.addColorStop(1, 'rgba(46, 27, 14, 0.90)');
+  outer.addColorStop(0.38, selected ? 'rgba(245, 212, 132, 0.96)' : 'rgba(130, 214, 208, 0.74)');
+  outer.addColorStop(0.74, selected ? 'rgba(183, 142, 70, 0.92)' : 'rgba(27, 106, 100, 0.82)');
+  outer.addColorStop(1, 'rgba(46, 27, 14, 0.95)');
   ctx.fillStyle = outer;
   ctx.beginPath();
-  ctx.arc(128, 123, 88, 0, Math.PI * 2);
+  ctx.arc(128, 122, 92, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.save();
   ctx.beginPath();
-  ctx.arc(128, 123, 70, 0, Math.PI * 2);
+  ctx.arc(128, 122, 69, 0, Math.PI * 2);
   ctx.clip();
   const image = expeditionRegionTileReady(spriteAsset);
   if (image) {
-    ctx.drawImage(image, 48, 42, 160, 160);
+    ctx.drawImage(image, 45, 38, 166, 166);
   } else {
     const fallback = ctx.createRadialGradient(110, 76, 16, 128, 126, 82);
     fallback.addColorStop(0, style.accent);
     fallback.addColorStop(1, style.fill);
     ctx.fillStyle = fallback;
-    ctx.fillRect(48, 42, 160, 160);
+    ctx.fillRect(45, 38, 166, 166);
     ctx.fillStyle = style.accent;
     ctx.font = '900 54px Georgia, serif';
     ctx.textAlign = 'center';
@@ -3422,34 +3425,49 @@ function makeExpeditionGeneratedHudProfileTexture(unit = {}, selected = false) {
     ctx.fillText(expeditionHudUnitLabel(unit), 128, 122, 112);
   }
   ctx.globalCompositeOperation = 'multiply';
-  ctx.fillStyle = selected ? 'rgba(255, 248, 232, 0.04)' : 'rgba(12, 33, 30, 0.10)';
-  ctx.fillRect(48, 42, 160, 160);
+  ctx.fillStyle = selected ? 'rgba(255, 248, 232, 0.03)' : 'rgba(12, 33, 30, 0.13)';
+  ctx.fillRect(45, 38, 166, 166);
+  ctx.globalCompositeOperation = 'screen';
+  const portraitGlow = ctx.createLinearGradient(48, 38, 206, 184);
+  portraitGlow.addColorStop(0, 'rgba(255, 248, 232, 0.18)');
+  portraitGlow.addColorStop(0.55, 'rgba(255, 248, 232, 0.02)');
+  portraitGlow.addColorStop(1, 'rgba(12, 33, 30, 0.00)');
+  ctx.fillStyle = portraitGlow;
+  ctx.fillRect(45, 38, 166, 166);
   ctx.restore();
 
-  ctx.strokeStyle = selected ? '#f5d484' : 'rgba(255, 248, 232, 0.66)';
+  ctx.strokeStyle = selected ? '#f5d484' : 'rgba(255, 248, 232, 0.72)';
   ctx.lineWidth = selected ? 10 : 7;
   ctx.beginPath();
-  ctx.arc(128, 123, 72, 0, Math.PI * 2);
+  ctx.arc(128, 122, 72, 0, Math.PI * 2);
   ctx.stroke();
 
-  ctx.strokeStyle = 'rgba(12, 33, 30, 0.48)';
+  ctx.strokeStyle = 'rgba(12, 33, 30, 0.62)';
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.arc(128, 122, 90, -0.84, Math.PI * 1.38);
+  ctx.stroke();
+
+  for (let index = 0; index < 8; index += 1) {
+    const angle = (Math.PI * 2 * index) / 8;
+    drawExpeditionHudRivet(ctx, 128 + Math.cos(angle) * 88, 122 + Math.sin(angle) * 88, selected ? 4.5 : 3.8, index % 2 === 0);
+  }
+
+  const badge = ctx.createLinearGradient(82, 186, 174, 219);
+  badge.addColorStop(0, selected ? 'rgba(255, 248, 232, 0.98)' : 'rgba(255, 248, 232, 0.92)');
+  badge.addColorStop(1, selected ? 'rgba(245, 212, 132, 0.92)' : 'rgba(130, 214, 208, 0.64)');
+  ctx.fillStyle = badge;
+  ctx.strokeStyle = 'rgba(46, 27, 14, 0.58)';
   ctx.lineWidth = 4;
   ctx.beginPath();
-  ctx.arc(128, 123, 89, -0.78, Math.PI * 1.34);
-  ctx.stroke();
-
-  ctx.fillStyle = selected ? 'rgba(245, 212, 132, 0.98)' : 'rgba(255, 248, 232, 0.92)';
-  ctx.strokeStyle = 'rgba(46, 27, 14, 0.46)';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.roundRect(82, 188, 92, 28, 14);
+  ctx.roundRect(80, 187, 96, 31, 11);
   ctx.fill();
   ctx.stroke();
   ctx.fillStyle = '#2e1b0e';
   ctx.font = '900 18px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(expeditionHudUnitLabel(unit), 128, 203, 72);
+  ctx.fillText(expeditionHudUnitLabel(unit), 128, 203, 74);
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -3471,12 +3489,165 @@ function expeditionHudObjectiveLabel(model = {}) {
   return 'READY';
 }
 
+function expeditionHudCommandGlyph(commandId = '') {
+  const id = String(commandId || '');
+  if (id === 'move_unit') return '↦';
+  if (id === 'scout_sector') return '⌖';
+  if (id === 'prepare_settler_convoy') return '▣';
+  if (id === 'found_settlement') return '⌂';
+  if (/inspect/i.test(id)) return '◇';
+  return '✦';
+}
+
+function expeditionHudCommandLabel(command = {}) {
+  const id = String(command.commandId || '');
+  if (id === 'move_unit') return 'MOVE';
+  if (id === 'scout_sector') return 'SCOUT';
+  if (id === 'prepare_settler_convoy') return 'CONVOY';
+  if (id === 'found_settlement') return 'FOUND';
+  const label = String(command.label || id || 'CMD').replace(/_/g, ' ').trim();
+  return label.split(/\s+/).filter(Boolean).slice(0, 2).join(' ').toUpperCase() || 'CMD';
+}
+
+function expeditionHudCommandItems(unit = {}) {
+  const commands = Array.isArray(unit.commandHints) ? unit.commandHints : [];
+  return commands
+    .filter((command) => command && String(command.commandId || '').trim())
+    .slice(0, 5)
+    .map((command) => ({
+      commandId: String(command.commandId || ''),
+      enabled: command.enabled !== false,
+      glyph: expeditionHudCommandGlyph(command.commandId),
+      label: expeditionHudCommandLabel(command)
+    }));
+}
+
+function drawExpeditionHudRivet(ctx, x, y, radius = 7, lit = true) {
+  const cap = ctx.createRadialGradient(x - radius * 0.35, y - radius * 0.45, 1, x, y, radius * 1.18);
+  cap.addColorStop(0, lit ? 'rgba(255, 248, 232, 0.95)' : 'rgba(245, 212, 132, 0.82)');
+  cap.addColorStop(0.45, 'rgba(182, 151, 84, 0.92)');
+  cap.addColorStop(1, 'rgba(46, 27, 14, 0.86)');
+  ctx.fillStyle = cap;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(12, 33, 30, 0.55)';
+  ctx.lineWidth = Math.max(1.5, radius * 0.24);
+  ctx.stroke();
+}
+
+function drawExpeditionHudPatina(ctx, width, height, alpha = 0.12) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  for (let index = 0; index < 120; index += 1) {
+    const x = (index * 97 + 23) % width;
+    const y = (index * 53 + 41) % height;
+    const size = 1 + (index % 3);
+    ctx.fillStyle = index % 2 === 0 ? 'rgba(255, 248, 232, 0.55)' : 'rgba(12, 33, 30, 0.45)';
+    ctx.fillRect(x, y, size, 1);
+  }
+  ctx.restore();
+}
+
+function expeditionHudSlotMaterial(slot = '') {
+  const darkHardware = ['crest-status', 'command-tray', 'command-puck', 'collapsed-ledger'].includes(slot);
+  const bottomHardware = ['unit-dock', 'command-tray', 'command-puck'].includes(slot);
+  return {
+    darkHardware,
+    bottomHardware,
+    outerA: darkHardware ? 'rgba(10, 44, 41, 0.96)' : 'rgba(78, 58, 32, 0.86)',
+    outerB: darkHardware ? 'rgba(23, 90, 84, 0.92)' : 'rgba(183, 142, 70, 0.76)',
+    outerC: darkHardware ? 'rgba(45, 31, 18, 0.92)' : 'rgba(18, 58, 52, 0.72)',
+    insetA: darkHardware ? 'rgba(16, 45, 41, 0.76)' : 'rgba(255, 248, 232, 0.72)',
+    insetB: darkHardware ? 'rgba(41, 69, 58, 0.64)' : 'rgba(222, 201, 143, 0.62)',
+    strokeA: 'rgba(245, 212, 132, 0.78)',
+    strokeB: darkHardware ? 'rgba(130, 214, 208, 0.34)' : 'rgba(46, 27, 14, 0.34)',
+    shadow: bottomHardware ? 'rgba(4, 16, 15, 0.40)' : 'rgba(4, 16, 15, 0.26)',
+    glow: darkHardware ? 'rgba(130, 214, 208, 0.38)' : 'rgba(245, 212, 132, 0.34)'
+  };
+}
+
+function makeExpeditionGeneratedHudCommandTexture(item = {}) {
+  const commandId = String(item.commandId || 'command');
+  const glyph = String(item.glyph || expeditionHudCommandGlyph(commandId)).slice(0, 3);
+  const label = String(item.label || expeditionHudCommandLabel(item)).toUpperCase().slice(0, 10);
+  const enabled = item.enabled !== false;
+  const key = `expedition-hud-command:${EXPEDITION_GENERATED_HUD_MATERIALITY_VERSION}:${commandId}:${enabled ? 'enabled' : 'disabled'}:${glyph}:${label}`;
+  if (textureCache.has(key)) return textureCache.get(key);
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = 'rgba(4, 16, 15, 0.38)';
+  ctx.beginPath();
+  ctx.ellipse(128, 213, 72, 18, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  const body = ctx.createRadialGradient(82, 58, 12, 128, 120, 108);
+  body.addColorStop(0, enabled ? 'rgba(255, 248, 232, 0.98)' : 'rgba(190, 184, 156, 0.72)');
+  body.addColorStop(0.33, enabled ? 'rgba(245, 212, 132, 0.92)' : 'rgba(101, 113, 104, 0.62)');
+  body.addColorStop(0.68, enabled ? 'rgba(27, 106, 100, 0.90)' : 'rgba(33, 48, 45, 0.74)');
+  body.addColorStop(1, 'rgba(46, 27, 14, 0.92)');
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.arc(128, 113, 86, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = enabled ? 'rgba(46, 27, 14, 0.76)' : 'rgba(46, 27, 14, 0.46)';
+  ctx.lineWidth = 11;
+  ctx.beginPath();
+  ctx.arc(128, 113, 78, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = enabled ? 'rgba(255, 248, 232, 0.78)' : 'rgba(255, 248, 232, 0.36)';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(128, 113, 64, 0, Math.PI * 2);
+  ctx.stroke();
+
+  [60, 196].forEach((x) => drawExpeditionHudRivet(ctx, x, 113, 6, enabled));
+
+  ctx.fillStyle = enabled ? '#fff8e8' : 'rgba(255, 248, 232, 0.56)';
+  ctx.strokeStyle = enabled ? 'rgba(12, 33, 30, 0.72)' : 'rgba(12, 33, 30, 0.42)';
+  ctx.lineWidth = 8;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = enabled ? 'rgba(245, 212, 132, 0.38)' : 'transparent';
+  ctx.shadowBlur = enabled ? 12 : 0;
+  ctx.font = '900 68px Georgia, serif';
+  ctx.strokeText(glyph, 128, 108, 116);
+  ctx.fillText(glyph, 128, 108, 116);
+  ctx.shadowBlur = 0;
+
+  const labelPlate = ctx.createLinearGradient(54, 176, 202, 212);
+  labelPlate.addColorStop(0, enabled ? 'rgba(255, 248, 232, 0.96)' : 'rgba(190, 184, 156, 0.62)');
+  labelPlate.addColorStop(1, enabled ? 'rgba(245, 212, 132, 0.80)' : 'rgba(101, 113, 104, 0.48)');
+  ctx.fillStyle = labelPlate;
+  ctx.strokeStyle = 'rgba(46, 27, 14, 0.66)';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.roundRect(54, 178, 148, 34, 10);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = enabled ? '#2e1b0e' : 'rgba(46, 27, 14, 0.62)';
+  ctx.font = '900 18px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  ctx.fillText(label, 128, 196, 118);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  textureCache.set(key, texture);
+  return texture;
+}
+
 function makeExpeditionGeneratedHudTextTexture(item = {}) {
   const slot = String(item.slot || '');
   const title = String(item.title || '').toUpperCase().slice(0, 18);
   const meta = String(item.meta || '').toUpperCase().slice(0, 24);
   const tone = String(item.tone || 'light');
-  const key = `expedition-hud-text:${EXPEDITION_GENERATED_HUD_MASK_LAYER_VERSION}:${slot}:${tone}:${title}:${meta}`;
+  const key = `expedition-hud-text:${EXPEDITION_GENERATED_HUD_MATERIALITY_VERSION}:${slot}:${tone}:${title}:${meta}`;
   if (textureCache.has(key)) return textureCache.get(key);
   const canvas = document.createElement('canvas');
   canvas.width = 768;
@@ -3485,32 +3656,50 @@ function makeExpeditionGeneratedHudTextTexture(item = {}) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const light = tone !== 'dark';
   const centered = slot === 'command-puck';
-  const titleX = centered ? 384 : 30;
-  const metaX = centered ? 384 : 34;
-  ctx.fillStyle = light ? 'rgba(12, 33, 30, 0.42)' : 'rgba(255, 248, 232, 0.68)';
-  ctx.strokeStyle = light ? 'rgba(245, 212, 132, 0.40)' : 'rgba(101, 74, 28, 0.24)';
-  ctx.lineWidth = 3;
+  const titleX = centered ? 384 : 36;
+  const metaX = centered ? 384 : 40;
+  const plateX = centered ? 70 : 12;
+  const plateW = centered ? 628 : 704;
+  const plate = ctx.createLinearGradient(plateX, 20, plateX + plateW, 168);
+  plate.addColorStop(0, light ? 'rgba(10, 44, 41, 0.78)' : 'rgba(255, 248, 232, 0.82)');
+  plate.addColorStop(0.48, light ? 'rgba(27, 106, 100, 0.58)' : 'rgba(242, 224, 171, 0.74)');
+  plate.addColorStop(1, light ? 'rgba(46, 27, 14, 0.70)' : 'rgba(183, 142, 70, 0.52)');
+  ctx.fillStyle = plate;
+  ctx.strokeStyle = light ? 'rgba(245, 212, 132, 0.62)' : 'rgba(46, 27, 14, 0.42)';
+  ctx.lineWidth = 5;
   ctx.beginPath();
-  ctx.roundRect(10, 20, 748, 152, 34);
+  ctx.roundRect(plateX, 26, plateW, 134, 20);
   ctx.fill();
   ctx.stroke();
-  ctx.fillStyle = light ? 'rgba(255, 248, 232, 0.94)' : 'rgba(46, 27, 14, 0.92)';
-  ctx.strokeStyle = light ? 'rgba(12, 33, 30, 0.58)' : 'rgba(255, 248, 232, 0.50)';
-  ctx.shadowColor = light ? 'rgba(12, 33, 30, 0.34)' : 'rgba(255, 248, 232, 0.24)';
-  ctx.shadowBlur = 10;
-  ctx.lineWidth = 8;
+
+  ctx.globalAlpha = 0.86;
+  ctx.strokeStyle = light ? 'rgba(130, 214, 208, 0.32)' : 'rgba(255, 248, 232, 0.34)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(plateX + 22, 50);
+  ctx.lineTo(plateX + plateW - 22, 50);
+  ctx.moveTo(plateX + 22, 142);
+  ctx.lineTo(plateX + plateW - 22, 142);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  ctx.fillStyle = light ? 'rgba(255, 248, 232, 0.98)' : 'rgba(46, 27, 14, 0.95)';
+  ctx.strokeStyle = light ? 'rgba(12, 33, 30, 0.70)' : 'rgba(255, 248, 232, 0.60)';
+  ctx.shadowColor = light ? 'rgba(12, 33, 30, 0.52)' : 'rgba(255, 248, 232, 0.24)';
+  ctx.shadowBlur = light ? 8 : 5;
+  ctx.lineWidth = 7;
   ctx.textAlign = centered ? 'center' : 'left';
   ctx.textBaseline = 'middle';
-  ctx.font = '900 64px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  ctx.font = '900 54px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
   if (title) {
-    ctx.strokeText(title, titleX, 72, 706);
-    ctx.fillText(title, titleX, 72, 706);
+    ctx.strokeText(title, titleX, 76, centered ? 560 : 640);
+    ctx.fillText(title, titleX, 76, centered ? 560 : 640);
   }
-  ctx.font = '800 36px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  ctx.font = '850 30px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
   ctx.globalAlpha = 0.90;
   if (meta) {
-    ctx.strokeText(meta, metaX, 136, 700);
-    ctx.fillText(meta, metaX, 136, 700);
+    ctx.strokeText(meta, metaX, 132, centered ? 520 : 610);
+    ctx.fillText(meta, metaX, 132, centered ? 520 : 610);
   }
   ctx.globalAlpha = 1;
   ctx.shadowBlur = 0;
@@ -3524,7 +3713,7 @@ function makeExpeditionGeneratedHudTextTexture(item = {}) {
 
 function makeExpeditionCleanHudChromeTexture(asset = {}) {
   const slot = String(asset.slot || 'hud');
-  const key = `expedition-clean-hud-chrome:${EXPEDITION_GENERATED_HUD_CLEAN_COMPOSITE_VERSION}:${slot}`;
+  const key = `expedition-clean-hud-chrome:${EXPEDITION_GENERATED_HUD_MATERIALITY_VERSION}:${slot}`;
   if (textureCache.has(key)) return textureCache.get(key);
   const vertical = slot === 'collapsed-ledger';
   const square = slot === 'command-puck';
@@ -3535,75 +3724,188 @@ function makeExpeditionCleanHudChromeTexture(asset = {}) {
   const width = canvas.width;
   const height = canvas.height;
   const pad = square ? 28 : vertical ? 24 : 34;
-  const radius = square ? 160 : vertical ? 72 : 86;
+  const radius = square ? 148 : vertical ? 56 : 64;
+  const material = expeditionHudSlotMaterial(slot);
   ctx.clearRect(0, 0, width, height);
 
-  const frame = ctx.createLinearGradient(0, 0, width, height);
-  frame.addColorStop(0, slot === 'crest-status' || slot === 'collapsed-ledger'
-    ? 'rgba(12, 33, 30, 0.24)'
-    : 'rgba(255, 248, 232, 0.18)');
-  frame.addColorStop(0.55, slot === 'command-puck' || slot === 'command-tray'
-    ? 'rgba(27, 106, 100, 0.18)'
-    : 'rgba(182, 151, 84, 0.10)');
-  frame.addColorStop(1, slot === 'crest-status' || slot === 'collapsed-ledger'
-    ? 'rgba(22, 62, 56, 0.18)'
-    : 'rgba(12, 33, 30, 0.08)');
-
   ctx.save();
-  ctx.shadowColor = 'rgba(12, 33, 30, 0.14)';
-  ctx.shadowBlur = 8;
-  ctx.shadowOffsetY = 3;
-  ctx.fillStyle = frame;
+  ctx.shadowColor = material.shadow;
+  ctx.shadowBlur = material.bottomHardware ? 28 : 18;
+  ctx.shadowOffsetY = material.bottomHardware ? 12 : 6;
+  const outer = ctx.createLinearGradient(0, 0, width, height);
+  outer.addColorStop(0, material.outerA);
+  outer.addColorStop(0.46, material.outerB);
+  outer.addColorStop(1, material.outerC);
+  ctx.fillStyle = outer;
   ctx.beginPath();
   ctx.roundRect(pad, pad, width - (pad * 2), height - (pad * 2), radius);
   ctx.fill();
   ctx.restore();
 
-  ctx.strokeStyle = 'rgba(245, 212, 132, 0.38)';
-  ctx.lineWidth = square ? 10 : vertical ? 8 : 7;
+  ctx.save();
   ctx.beginPath();
-  ctx.roundRect(pad + 6, pad + 6, width - ((pad + 6) * 2), height - ((pad + 6) * 2), Math.max(24, radius - 14));
+  ctx.roundRect(pad, pad, width - (pad * 2), height - (pad * 2), radius);
+  ctx.clip();
+  drawExpeditionHudPatina(ctx, width, height, material.darkHardware ? 0.16 : 0.10);
+  ctx.restore();
+
+  const bevel = ctx.createLinearGradient(pad, pad, width - pad, height - pad);
+  bevel.addColorStop(0, 'rgba(255, 248, 232, 0.56)');
+  bevel.addColorStop(0.24, material.strokeA);
+  bevel.addColorStop(0.72, 'rgba(46, 27, 14, 0.34)');
+  bevel.addColorStop(1, material.strokeB);
+  ctx.strokeStyle = bevel;
+  ctx.lineWidth = square ? 12 : vertical ? 9 : 9;
+  ctx.beginPath();
+  ctx.roundRect(pad + 5, pad + 5, width - ((pad + 5) * 2), height - ((pad + 5) * 2), Math.max(18, radius - 8));
   ctx.stroke();
 
-  ctx.strokeStyle = 'rgba(12, 33, 30, 0.24)';
+  const innerPad = pad + (square ? 34 : vertical ? 28 : 30);
+  const inset = ctx.createLinearGradient(innerPad, innerPad, width - innerPad, height - innerPad);
+  inset.addColorStop(0, material.insetA);
+  inset.addColorStop(1, material.insetB);
+  ctx.fillStyle = inset;
+  ctx.strokeStyle = material.strokeB;
   ctx.lineWidth = square ? 5 : 4;
   ctx.beginPath();
-  ctx.roundRect(pad + 22, pad + 22, width - ((pad + 22) * 2), height - ((pad + 22) * 2), Math.max(18, radius - 30));
+  ctx.roundRect(innerPad, innerPad, width - (innerPad * 2), height - (innerPad * 2), Math.max(16, radius - 28));
+  ctx.fill();
   ctx.stroke();
 
-  ctx.globalAlpha = 0.42;
-  ctx.strokeStyle = slot === 'crest-status' || slot === 'collapsed-ledger'
-    ? 'rgba(255, 248, 232, 0.46)'
-    : 'rgba(46, 27, 14, 0.34)';
-  ctx.lineWidth = 3;
+  const rivetPad = pad + 18;
+  [
+    [rivetPad, rivetPad],
+    [width - rivetPad, rivetPad],
+    [rivetPad, height - rivetPad],
+    [width - rivetPad, height - rivetPad],
+  ].forEach(([x, y], index) => drawExpeditionHudRivet(ctx, x, y, square ? 9 : vertical ? 6 : 7, index < 2));
+
+  ctx.globalAlpha = 0.72;
+  ctx.strokeStyle = material.darkHardware ? 'rgba(255, 248, 232, 0.50)' : 'rgba(46, 27, 14, 0.40)';
+  ctx.fillStyle = material.darkHardware ? 'rgba(255, 248, 232, 0.18)' : 'rgba(12, 33, 30, 0.12)';
+  ctx.lineWidth = 4;
   if (slot === 'unit-dock') {
+    const railY = height * 0.62;
+    ctx.strokeStyle = 'rgba(46, 27, 14, 0.48)';
+    ctx.lineWidth = 5;
     ctx.beginPath();
-    ctx.arc(152, height / 2, 92, 0, Math.PI * 2);
+    ctx.moveTo(width * 0.30, railY);
+    ctx.lineTo(width * 0.90, railY);
     ctx.stroke();
+    ctx.strokeStyle = 'rgba(245, 212, 132, 0.42)';
+    ctx.lineWidth = 3;
+    for (let index = 0; index < 6; index += 1) {
+      const x = width * 0.43 + (index * width * 0.085);
+      ctx.beginPath();
+      ctx.arc(x, railY - 10, 42, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x, railY - 10, 27, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(12, 33, 30, 0.54)';
+    ctx.lineWidth = 5;
     ctx.beginPath();
-    ctx.arc(152, height / 2, 58, 0, Math.PI * 2);
+    ctx.arc(158, height / 2, 86, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(245, 212, 132, 0.42)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(158, height / 2, 54, 0, Math.PI * 2);
     ctx.stroke();
   } else if (slot === 'crest-status') {
+    const cx = 156;
+    const cy = height / 2;
+    ctx.strokeStyle = 'rgba(245, 212, 132, 0.72)';
+    ctx.lineWidth = 6;
     ctx.beginPath();
-    ctx.arc(172, height / 2, 74, 0, Math.PI * 2);
+    ctx.arc(cx, cy, 72, 0, Math.PI * 2);
     ctx.stroke();
+    ctx.strokeStyle = 'rgba(130, 214, 208, 0.42)';
+    ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.moveTo(172, (height / 2) - 46);
-    ctx.lineTo(204, height / 2);
-    ctx.lineTo(172, (height / 2) + 46);
-    ctx.lineTo(140, height / 2);
+    ctx.arc(cx, cy, 50, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255, 248, 232, 0.62)';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 48);
+    ctx.lineTo(cx + 26, cy);
+    ctx.lineTo(cx, cy + 48);
+    ctx.lineTo(cx - 26, cy);
     ctx.closePath();
+    ctx.fill();
     ctx.stroke();
   } else if (slot === 'collapsed-ledger') {
+    ctx.strokeStyle = 'rgba(245, 212, 132, 0.58)';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(width / 2, 128);
+    ctx.lineTo(width / 2, height - 128);
+    ctx.stroke();
     for (let index = 0; index < 7; index += 1) {
       const y = 180 + (index * 96);
+      ctx.fillStyle = index % 2 === 0 ? 'rgba(255, 248, 232, 0.26)' : 'rgba(130, 214, 208, 0.20)';
       ctx.beginPath();
-      ctx.arc(width / 2, y, 16, 0, Math.PI * 2);
+      ctx.arc(width / 2, y, 22, 0, Math.PI * 2);
+      ctx.fill();
       ctx.stroke();
     }
   } else if (slot === 'command-puck') {
+    ctx.strokeStyle = 'rgba(245, 212, 132, 0.68)';
+    ctx.lineWidth = 8;
     ctx.beginPath();
-    ctx.arc(width / 2, height / 2, 108, 0, Math.PI * 2);
+    ctx.arc(width / 2, height / 2, 110, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(130, 214, 208, 0.34)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(width / 2, height / 2, 78, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (slot === 'command-tray') {
+    const deckY = height * 0.57;
+    ctx.fillStyle = 'rgba(4, 16, 15, 0.30)';
+    ctx.beginPath();
+    ctx.roundRect(width * 0.12, deckY - 46, width * 0.72, 92, 32);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(245, 212, 132, 0.44)';
+    ctx.lineWidth = 4;
+    for (let index = 0; index < 5; index += 1) {
+      const x = width * 0.23 + (index * width * 0.115);
+      ctx.beginPath();
+      ctx.arc(x, deckY, 38, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(130, 214, 208, 0.40)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(width * 0.19, height * 0.78);
+    ctx.lineTo(width * 0.72, height * 0.78);
+    ctx.stroke();
+  } else if (slot === 'objective-loop') {
+    ctx.strokeStyle = 'rgba(46, 27, 14, 0.44)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(width * 0.14, height * 0.54);
+    ctx.bezierCurveTo(width * 0.28, height * 0.34, width * 0.44, height * 0.74, width * 0.62, height * 0.52);
+    ctx.stroke();
+    for (let index = 0; index < 5; index += 1) {
+      drawExpeditionHudRivet(ctx, width * (0.15 + index * 0.12), height * (0.54 + (index % 2 === 0 ? -0.04 : 0.05)), 6, index === 0);
+    }
+  } else if (slot === 'selected-context') {
+    const cx = width * 0.20;
+    const cy = height * 0.52;
+    ctx.strokeStyle = 'rgba(27, 106, 100, 0.54)';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 52, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(245, 212, 132, 0.52)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(cx - 64, cy);
+    ctx.lineTo(cx + 64, cy);
+    ctx.moveTo(cx, cy - 64);
+    ctx.lineTo(cx, cy + 64);
     ctx.stroke();
   }
   ctx.globalAlpha = 1;
@@ -4109,6 +4411,7 @@ class ExpeditionMapThreeStage {
     this.generatedHudChromeSprites = [];
     this.generatedHudProfileSprites = [];
     this.generatedHudTextSprites = [];
+    this.generatedHudCommandSprites = [];
     this.outcomeFeedback = null;
     this.hoverCellId = '';
     this.terrainUnderlayCount = 0;
@@ -4123,6 +4426,7 @@ class ExpeditionMapThreeStage {
     this.generatedHudChromeCount = 0;
     this.generatedHudProfileCount = 0;
     this.generatedHudTextCount = 0;
+    this.generatedHudCommandCount = 0;
     this.scene = new THREE.Scene();
     this.camera = new THREE.OrthographicCamera(-EXPEDITION_WORLD_WIDTH / 2, EXPEDITION_WORLD_WIDTH / 2, EXPEDITION_WORLD_HEIGHT / 2, -EXPEDITION_WORLD_HEIGHT / 2, 0.1, 100);
     this.camera.position.set(0, 0, 10);
@@ -4211,6 +4515,7 @@ class ExpeditionMapThreeStage {
     this.generatedHudChromeSprites = [];
     this.generatedHudProfileSprites = [];
     this.generatedHudTextSprites = [];
+    this.generatedHudCommandSprites = [];
     this.terrainUnderlayCount = 0;
     this.surveyStrokeCount = 0;
     this.markerCount = 0;
@@ -4223,6 +4528,7 @@ class ExpeditionMapThreeStage {
     this.generatedHudChromeCount = 0;
     this.generatedHudProfileCount = 0;
     this.generatedHudTextCount = 0;
+    this.generatedHudCommandCount = 0;
     this.edgeFogCount = 0;
     this.civicBeaconCount = 0;
   }
@@ -4654,7 +4960,7 @@ class ExpeditionMapThreeStage {
         transparent: true,
         depthWrite: false,
         depthTest: false,
-        opacity: clamp(number(asset.opacity, 0.72) * 0.62, 0.16, 0.34),
+        opacity: clamp(number(asset.opacity, 0.72) * 1.34, 0.54, 0.86),
         alphaTest: 0.02
       }));
       sprite.renderOrder = 900 + index;
@@ -4670,6 +4976,8 @@ class ExpeditionMapThreeStage {
         marginY: number(asset.marginY, 0.02),
         assetReady: true,
         cleanCompositeVersion: EXPEDITION_GENERATED_HUD_CLEAN_COMPOSITE_VERSION,
+        materialityVersion: EXPEDITION_GENERATED_HUD_MATERIALITY_VERSION,
+        materialProfile: 'procedural_beveled_metal_parchment_frame',
         chromeSource: 'three_canvas_clean_frame',
         sourceAssetPath: String(asset.path || ''),
         liveTextSource: 'dom',
@@ -4743,6 +5051,7 @@ class ExpeditionMapThreeStage {
   addGeneratedHudContentLayer() {
     this.generatedHudProfileSprites = [];
     this.generatedHudTextSprites = [];
+    this.generatedHudCommandSprites = [];
     const units = Array.isArray(this.model.units?.items) ? this.model.units.items.filter((unit) => unit?.unitId).slice(0, 6) : [];
     const selectedUnit = units.find((unit) => String(unit.unitId || '') === String(this.selectedUnitId || '')) || units[0] || null;
     units.forEach((unit, index) => {
@@ -4759,6 +5068,7 @@ class ExpeditionMapThreeStage {
       sprite.userData = {
         kind: 'expedition_generated_hud_profile_mask',
         layerVersion: EXPEDITION_GENERATED_HUD_MASK_LAYER_VERSION,
+        materialityVersion: EXPEDITION_GENERATED_HUD_MATERIALITY_VERSION,
         slot: 'unit-profile',
         unitId: String(unit.unitId || ''),
         unitType: String(unit.unitType || ''),
@@ -4806,6 +5116,7 @@ class ExpeditionMapThreeStage {
       sprite.userData = {
         kind: 'expedition_generated_hud_text',
         layerVersion: EXPEDITION_GENERATED_HUD_MASK_LAYER_VERSION,
+        materialityVersion: EXPEDITION_GENERATED_HUD_MATERIALITY_VERSION,
         slot: String(item.slot || ''),
         title: String(item.title || ''),
         meta: String(item.meta || ''),
@@ -4822,6 +5133,39 @@ class ExpeditionMapThreeStage {
       this.scene.add(sprite);
     });
     this.generatedHudTextCount = this.generatedHudTextSprites.length;
+
+    const commandItems = selectedUnit ? expeditionHudCommandItems(selectedUnit) : [];
+    commandItems.forEach((item, index) => {
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: makeExpeditionGeneratedHudCommandTexture(item),
+        transparent: true,
+        depthWrite: false,
+        depthTest: false,
+        opacity: item.enabled === false ? 0.58 : 0.92,
+        alphaTest: 0.04
+      }));
+      sprite.renderOrder = 980 + index;
+      sprite.userData = {
+        kind: 'expedition_generated_hud_command_glyph',
+        layerVersion: EXPEDITION_GENERATED_HUD_SINGLE_OWNER_VERSION,
+        materialityVersion: EXPEDITION_GENERATED_HUD_MATERIALITY_VERSION,
+        slot: 'command-tray',
+        commandId: String(item.commandId || ''),
+        label: String(item.label || ''),
+        glyph: String(item.glyph || ''),
+        enabled: item.enabled !== false,
+        liveSource: 'server_owned_command_hint',
+        visualOnly: true,
+        readOnly: true,
+        selectable: false,
+        routeAuthority: false,
+        actionAuthority: false,
+        executableActions: 0
+      };
+      this.generatedHudCommandSprites.push(sprite);
+      this.scene.add(sprite);
+    });
+    this.generatedHudCommandCount = this.generatedHudCommandSprites.length;
     this.syncGeneratedHudContentSprites();
   }
 
@@ -4831,13 +5175,13 @@ class ExpeditionMapThreeStage {
     const compactHud = Number(this.canvas?.clientWidth || 0) <= 520;
     if (profiles.length) {
       const profileSize = compactHud
-        ? clamp(Math.min(unitDock.height * 0.54, unitDock.width / Math.max(4.4, profiles.length + 1.8)), 0.42, 0.66)
-        : clamp(Math.min(unitDock.height * 0.46, unitDock.width / Math.max(5.2, profiles.length + 1.8)), 0.40, 0.78);
+        ? clamp(Math.min(unitDock.height * 0.66, unitDock.width / Math.max(4.2, profiles.length + 1.4)), 0.46, 0.76)
+        : clamp(Math.min(unitDock.height * 0.62, unitDock.width / Math.max(4.7, profiles.length + 1.3)), 0.50, 0.96);
       const step = compactHud
-        ? clamp(unitDock.width * 0.14, profileSize * 1.10, profileSize * 1.50)
-        : clamp(unitDock.width * 0.115, profileSize * 1.18, profileSize * 1.72);
-      const startX = unitDock.left + (unitDock.width * (compactHud ? 0.50 : 0.32));
-      const y = unitDock.bottom + (unitDock.height * (compactHud ? 0.52 : 0.50));
+        ? clamp(unitDock.width * 0.145, profileSize * 1.08, profileSize * 1.48)
+        : clamp(unitDock.width * 0.118, profileSize * 1.10, profileSize * 1.58);
+      const startX = unitDock.left + (unitDock.width * (compactHud ? 0.47 : 0.34));
+      const y = unitDock.bottom + (unitDock.height * (compactHud ? 0.55 : 0.53));
       profiles.forEach((sprite, index) => {
         sprite.position.set(startX + (index * step), y, 4.50 + (index * 0.004));
         sprite.scale.set(profileSize, profileSize, 1);
@@ -4853,21 +5197,26 @@ class ExpeditionMapThreeStage {
       let y = bounds.top - (bounds.height * 0.50);
       let maxWidth = bounds.width;
       let maxHeight = bounds.height;
-      if (slot === 'objective-loop') {
+      if (slot === 'crest-status') {
+        width = bounds.width * 0.54;
+        height = bounds.height * 0.48;
+        x = bounds.left + (bounds.width * 0.62);
+        y = bounds.top - (bounds.height * 0.50);
+      } else if (slot === 'objective-loop') {
         width = bounds.width * 0.68;
         height = bounds.height * 0.52;
         x = bounds.left + (bounds.width * 0.54);
         y = bounds.top - (bounds.height * 0.50);
       } else if (slot === 'unit-dock') {
-        width = bounds.width * (compactHud ? 0.34 : 0.26);
-        height = bounds.height * 0.46;
-        x = bounds.left + (bounds.width * (compactHud ? 0.34 : 0.16));
-        y = bounds.bottom + (bounds.height * 0.56);
+        width = bounds.width * (compactHud ? 0.35 : 0.25);
+        height = bounds.height * 0.42;
+        x = bounds.left + (bounds.width * (compactHud ? 0.31 : 0.15));
+        y = bounds.bottom + (bounds.height * 0.57);
       } else if (slot === 'command-puck') {
         bounds = this.generatedHudBoundsForSlot('command-tray');
-        width = bounds.width * 0.54;
-        height = bounds.height * 0.58;
-        x = bounds.left + (bounds.width * 0.49);
+        width = bounds.width * (compactHud ? 0.38 : 0.36);
+        height = bounds.height * 0.54;
+        x = bounds.left + (bounds.width * (compactHud ? 0.66 : 0.70));
         y = bounds.top - (bounds.height * 0.48);
         maxWidth = bounds.width * 0.74;
         maxHeight = bounds.height * 0.78;
@@ -4880,6 +5229,21 @@ class ExpeditionMapThreeStage {
       sprite.position.set(x, y, 4.62);
       sprite.scale.set(clamp(width, 0.58, maxWidth), clamp(height, 0.24, maxHeight), 1);
     });
+
+    const commandTray = this.generatedHudBoundsForSlot('command-tray');
+    const commandSprites = this.generatedHudCommandSprites;
+    if (commandSprites.length) {
+      const size = compactHud
+        ? clamp(Math.min(commandTray.height * 0.54, commandTray.width / Math.max(4.0, commandSprites.length + 0.9)), 0.38, 0.62)
+        : clamp(Math.min(commandTray.height * 0.56, commandTray.width / Math.max(4.4, commandSprites.length + 1.0)), 0.42, 0.78);
+      const step = clamp(commandTray.width / Math.max(4.5, commandSprites.length + 0.8), size * 1.02, size * 1.42);
+      const startX = commandTray.left + (commandTray.width * (compactHud ? 0.26 : 0.28));
+      const y = commandTray.bottom + (commandTray.height * (compactHud ? 0.52 : 0.51));
+      commandSprites.forEach((sprite, index) => {
+        sprite.position.set(startX + (index * step), y, 4.72 + (index * 0.004));
+        sprite.scale.set(size, size, 1);
+      });
+    }
   }
 
   applyCameraBounds() {
@@ -5118,6 +5482,8 @@ class ExpeditionMapThreeStage {
       anchor: String(sprite.userData?.anchor || ''),
       assetReady: sprite.userData?.assetReady === true,
       cleanCompositeVersion: String(sprite.userData?.cleanCompositeVersion || ''),
+      materialityVersion: String(sprite.userData?.materialityVersion || ''),
+      materialProfile: String(sprite.userData?.materialProfile || ''),
       chromeSource: String(sprite.userData?.chromeSource || ''),
       sourceAssetPath: String(sprite.userData?.sourceAssetPath || ''),
       liveTextSource: String(sprite.userData?.liveTextSource || ''),
@@ -5136,6 +5502,7 @@ class ExpeditionMapThreeStage {
       unitType: String(sprite.userData?.unitType || ''),
       profileMask: String(sprite.userData?.profileMask || ''),
       profileSource: String(sprite.userData?.profileSource || ''),
+      materialityVersion: String(sprite.userData?.materialityVersion || ''),
       spriteAssetSlot: String(sprite.userData?.spriteAssetSlot || ''),
       spriteAssetPath: String(sprite.userData?.spriteAssetPath || ''),
       spriteAssetReady: sprite.userData?.spriteAssetReady === true,
@@ -5153,6 +5520,7 @@ class ExpeditionMapThreeStage {
       title: String(sprite.userData?.title || ''),
       meta: String(sprite.userData?.meta || ''),
       liveTextSource: String(sprite.userData?.liveTextSource || ''),
+      materialityVersion: String(sprite.userData?.materialityVersion || ''),
       domA11yOverlayRetained: sprite.userData?.domA11yOverlayRetained === true,
       visualOnly: sprite.userData?.visualOnly === true,
       readOnly: sprite.userData?.readOnly === true,
@@ -5161,6 +5529,39 @@ class ExpeditionMapThreeStage {
       actionAuthority: sprite.userData?.actionAuthority === true,
       executableActions: Number(sprite.userData?.executableActions || 0),
       canvas: this.canvasPointForObject(sprite)
+    }));
+    const generatedHudCommandSprites = this.generatedHudCommandSprites.map((sprite) => ({
+      slot: String(sprite.userData?.slot || ''),
+      layerVersion: String(sprite.userData?.layerVersion || ''),
+      commandId: String(sprite.userData?.commandId || ''),
+      label: String(sprite.userData?.label || ''),
+      glyph: String(sprite.userData?.glyph || ''),
+      enabled: sprite.userData?.enabled !== false,
+      liveSource: String(sprite.userData?.liveSource || ''),
+      materialityVersion: String(sprite.userData?.materialityVersion || ''),
+      visualOnly: sprite.userData?.visualOnly === true,
+      readOnly: sprite.userData?.readOnly === true,
+      selectable: sprite.userData?.selectable === true,
+      routeAuthority: sprite.userData?.routeAuthority === true,
+      actionAuthority: sprite.userData?.actionAuthority === true,
+      executableActions: Number(sprite.userData?.executableActions || 0),
+      canvas: this.canvasPointForObject(sprite)
+    }));
+    const visibleHudSlots = generatedHudChromeSprites.map((sprite) => ({
+      slot: sprite.slot,
+      owner: 'three_canvas',
+      source: 'three_canvas_clean_frame',
+      sourceCropPainted: sprite.chromeSource !== 'three_canvas_clean_frame',
+      materialityVersion: sprite.materialityVersion,
+      materialProfile: sprite.materialProfile,
+      visualOnly: sprite.visualOnly,
+      readOnly: sprite.readOnly,
+      selectable: sprite.selectable,
+      routeAuthority: sprite.routeAuthority,
+      actionAuthority: sprite.actionAuthority,
+      executableActions: sprite.executableActions,
+      noAuthority: !sprite.routeAuthority && !sprite.actionAuthority && sprite.executableActions === 0,
+      canvas: sprite.canvas
     }));
     this.info = {
       renderer: 'three.js',
@@ -5185,6 +5586,24 @@ class ExpeditionMapThreeStage {
           generatedSpriteAssetsReady: generatedSpriteAssetReadyCount,
           generatedSpriteAssetsVisualOnly: true,
           generatedSpriteAssetsReadOnly: true,
+          singleVisibleHudOwner: true,
+          visibleHudOwner: 'three_canvas',
+          visibleHudOwnerVersion: EXPEDITION_GENERATED_HUD_SINGLE_OWNER_VERSION,
+          domVisibleHudDemoted: true,
+          domHudRole: 'transparent_hit_a11y_layer',
+          domHudHitLayerRetained: true,
+          domHudHitLayerPainted: false,
+          visibleDomHudPaintCount: 0,
+          visibleDomHudTextCount: 0,
+          noVisibleDomHudDuplication: true,
+          rendererNetworkRequests: 0,
+          rendererMutationHandlers: [],
+          threeCanvasHudOwnsChrome: true,
+          threeCanvasHudOwnsProfiles: true,
+          threeCanvasHudOwnsText: true,
+          threeCanvasHudOwnsCommandTray: true,
+          threeCanvasHudOwnsCollapsedLedgerHint: true,
+          threeCanvasHudNoGameplayAuthority: true,
           generatedHudChrome: true,
           generatedHudChromeInThreeLayer: true,
           generatedHudChromeAssetPack: String(this.model.generatedHudChrome?.packId || EXPEDITION_GENERATED_HUD_CHROME_PACK_ID),
@@ -5193,6 +5612,16 @@ class ExpeditionMapThreeStage {
           generatedHudChromeAssetsReady: generatedHudChromeSprites.filter((sprite) => sprite.assetReady).length,
           generatedHudChromeCleanComposite: true,
           generatedHudChromeCleanCompositeVersion: EXPEDITION_GENERATED_HUD_CLEAN_COMPOSITE_VERSION,
+          generatedHudMaterialityPass: true,
+          generatedHudMaterialityVersion: EXPEDITION_GENERATED_HUD_MATERIALITY_VERSION,
+          generatedHudMaterialityRendererOwned: true,
+          generatedHudMaterialitySource: 'procedural_canvas_textures',
+          generatedHudMaterialityProfiles: generatedHudProfileSprites.every((sprite) => sprite.materialityVersion === EXPEDITION_GENERATED_HUD_MATERIALITY_VERSION),
+          generatedHudMaterialityText: generatedHudTextSprites.every((sprite) => sprite.materialityVersion === EXPEDITION_GENERATED_HUD_MATERIALITY_VERSION),
+          generatedHudMaterialityCommands: generatedHudCommandSprites.every((sprite) => sprite.materialityVersion === EXPEDITION_GENERATED_HUD_MATERIALITY_VERSION),
+          generatedHudMaterialityChromeSlots: generatedHudChromeSprites
+            .filter((sprite) => sprite.materialityVersion === EXPEDITION_GENERATED_HUD_MATERIALITY_VERSION)
+            .map((sprite) => sprite.slot),
           generatedHudChromeSourcePackRetained: generatedHudChromeSprites.every((sprite) => sprite.sourceAssetPath.includes(`/${EXPEDITION_GENERATED_HUD_CHROME_PACK_ID}/`)),
           generatedHudChromePaintedSourceCrops: generatedHudChromeSprites.some((sprite) => sprite.chromeSource !== 'three_canvas_clean_frame'),
           generatedHudChromeSpritesVisualOnly: generatedHudChromeSprites.every((sprite) => sprite.visualOnly),
@@ -5217,6 +5646,13 @@ class ExpeditionMapThreeStage {
           generatedHudTextSpritesReadOnly: generatedHudTextSprites.every((sprite) => sprite.readOnly),
           generatedHudTextSpritesSelectable: generatedHudTextSprites.some((sprite) => sprite.selectable),
           generatedHudTextAuthority: generatedHudTextSprites.some((sprite) => sprite.routeAuthority || sprite.actionAuthority || sprite.executableActions > 0),
+          generatedHudCommandGlyphsInThreeLayer: true,
+          generatedHudCommandGlyphSpriteCount: generatedHudCommandSprites.length,
+          generatedHudCommandGlyphLiveSource: 'server_owned_command_hint',
+          generatedHudCommandGlyphsVisualOnly: generatedHudCommandSprites.every((sprite) => sprite.visualOnly),
+          generatedHudCommandGlyphsReadOnly: generatedHudCommandSprites.every((sprite) => sprite.readOnly),
+          generatedHudCommandGlyphsSelectable: generatedHudCommandSprites.some((sprite) => sprite.selectable),
+          generatedHudCommandGlyphAuthority: generatedHudCommandSprites.some((sprite) => sprite.routeAuthority || sprite.actionAuthority || sprite.executableActions > 0),
           serverTerrainAssetContractVersion: EXPEDITION_PUBLIC_TERRAIN_CONTRACT_VERSION,
           serverTerrainSlotSource: EXPEDITION_PUBLIC_TERRAIN_SLOT_SOURCE,
           assetBackedRegionTiles: regionVisuals.filter((cell) => cell.assetPath).length,
@@ -5303,6 +5739,8 @@ class ExpeditionMapThreeStage {
       generatedHudChromeSprites,
       generatedHudProfileSprites,
       generatedHudTextSprites,
+      generatedHudCommandSprites,
+      visibleHudSlots,
       regionConsistency: {
         waterCueCells: regionVisuals.filter((cell) => cell.waterCue).map((cell) => cell.cellId),
         ruinSignalCueCells: regionVisuals.filter((cell) => cell.ruinSignalCue).map((cell) => cell.cellId),

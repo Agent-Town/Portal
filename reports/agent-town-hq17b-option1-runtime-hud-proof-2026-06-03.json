@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "generatedAt": "2026-06-03T11:37:01.528Z",
+  "generatedAt": "2026-06-03T13:32:44.820Z",
   "title": "HQ17B Option 1 runtime HUD visual proof",
   "source": "FP-E2E-022B1 continuous guarded endpoint replay with HQ17B DOM/CSS HUD slot assertions.",
   "branch": "neo/progression-atlas-editor-next-2026-05-29",
@@ -12,7 +12,7 @@
     "firstScout": {
       "endpointUsed": "et.plot.scout_sector",
       "revealedCellId": "cell_q1_r0",
-      "packetId": "expedition_event_packet_8db83568249b33f5",
+      "packetId": "expedition_event_packet_1f4c6da526288502",
       "boundaryFlags": {
         "samePlotOnly": true,
         "serverOwnedDiscoveryReceipt": true,
@@ -33,8 +33,8 @@
     },
     "packetPlan": {
       "endpointUsed": "et.plot.draft_site_plan_from_packet",
-      "planId": "site_plan_expedition_event_packet_8db83568249b33f5",
-      "packetId": "expedition_event_packet_8db83568249b33f5",
+      "planId": "site_plan_expedition_event_packet_1f4c6da526288502",
+      "packetId": "expedition_event_packet_1f4c6da526288502",
       "boundaryFlags": {
         "samePlotOnly": true,
         "createsSitePlan": true,
@@ -62,18 +62,18 @@
     },
     "review": {
       "endpointUsed": "et.plot.review_site_plan",
-      "planId": "site_plan_expedition_event_packet_8db83568249b33f5",
+      "planId": "site_plan_expedition_event_packet_1f4c6da526288502",
       "reviewStatus": "reviewed"
     },
     "prepareConvoy": {
       "endpointUsed": "et.plot.prepare_settler_convoy",
-      "claimId": "claim_f2acc03eccc983df",
+      "claimId": "claim_80218853e882ece9",
       "status": "CONVOY_PREPARING"
     },
     "foundOutpost": {
       "endpointUsed": "et.plot.found_settlement",
-      "claimId": "claim_f2acc03eccc983df",
-      "foundedPlotId": "plot_cf6a2552e6a6669d"
+      "claimId": "claim_80218853e882ece9",
+      "foundedPlotId": "plot_3042544f12aaa616"
     }
   },
   "hudProof": {
@@ -106,7 +106,8 @@
         "fp-expedition-map-body--map-first",
         "fp-expedition-map-body--hq17b-option1",
         "fp-expedition-map-body--hq17c-generated-chrome",
-        "fp-expedition-map-body--hq17d-three-masks"
+        "fp-expedition-map-body--hq17d-three-masks",
+        "fp-expedition-map-body--hq17f-single-owner-canvas-hud"
       ],
       "panelClasses": [
         "fp-parchment",
@@ -114,7 +115,8 @@
         "fp-expedition-map-panel",
         "fp-expedition-map-panel--hq17b-option1",
         "fp-expedition-map-panel--hq17c-generated-chrome",
-        "fp-expedition-map-panel--hq17d-three-masks"
+        "fp-expedition-map-panel--hq17d-three-masks",
+        "fp-expedition-map-panel--hq17f-single-owner-canvas-hud"
       ],
       "board": {
         "present": true,
@@ -300,7 +302,8 @@
         "fp-expedition-map-body--map-first",
         "fp-expedition-map-body--hq17b-option1",
         "fp-expedition-map-body--hq17c-generated-chrome",
-        "fp-expedition-map-body--hq17d-three-masks"
+        "fp-expedition-map-body--hq17d-three-masks",
+        "fp-expedition-map-body--hq17f-single-owner-canvas-hud"
       ],
       "panelClasses": [
         "fp-parchment",
@@ -308,7 +311,8 @@
         "fp-expedition-map-panel",
         "fp-expedition-map-panel--hq17b-option1",
         "fp-expedition-map-panel--hq17c-generated-chrome",
-        "fp-expedition-map-panel--hq17d-three-masks"
+        "fp-expedition-map-panel--hq17d-three-masks",
+        "fp-expedition-map-panel--hq17f-single-owner-canvas-hud"
       ],
       "board": {
         "present": true,
@@ -522,7 +526,8 @@
         "fp-expedition-map-body--map-first",
         "fp-expedition-map-body--hq17b-option1",
         "fp-expedition-map-body--hq17c-generated-chrome",
-        "fp-expedition-map-body--hq17d-three-masks"
+        "fp-expedition-map-body--hq17d-three-masks",
+        "fp-expedition-map-body--hq17f-single-owner-canvas-hud"
       ],
       "panelClasses": [
         "fp-parchment",
@@ -530,7 +535,8 @@
         "fp-expedition-map-panel",
         "fp-expedition-map-panel--hq17b-option1",
         "fp-expedition-map-panel--hq17c-generated-chrome",
-        "fp-expedition-map-panel--hq17d-three-masks"
+        "fp-expedition-map-panel--hq17d-three-masks",
+        "fp-expedition-map-panel--hq17f-single-owner-canvas-hud"
       ],
       "board": {
         "present": true,
@@ -701,6 +707,24 @@
       "generatedSpriteAssetsReady": 8,
       "generatedSpriteAssetsVisualOnly": true,
       "generatedSpriteAssetsReadOnly": true,
+      "singleVisibleHudOwner": true,
+      "visibleHudOwner": "three_canvas",
+      "visibleHudOwnerVersion": "hq17f_single_owner_canvas_hud_v1",
+      "domVisibleHudDemoted": true,
+      "domHudRole": "transparent_hit_a11y_layer",
+      "domHudHitLayerRetained": true,
+      "domHudHitLayerPainted": false,
+      "visibleDomHudPaintCount": 0,
+      "visibleDomHudTextCount": 0,
+      "noVisibleDomHudDuplication": true,
+      "rendererNetworkRequests": 0,
+      "rendererMutationHandlers": [],
+      "threeCanvasHudOwnsChrome": true,
+      "threeCanvasHudOwnsProfiles": true,
+      "threeCanvasHudOwnsText": true,
+      "threeCanvasHudOwnsCommandTray": true,
+      "threeCanvasHudOwnsCollapsedLedgerHint": true,
+      "threeCanvasHudNoGameplayAuthority": true,
       "generatedHudChrome": true,
       "generatedHudChromeInThreeLayer": true,
       "generatedHudChromeAssetPack": "hq17c-generated-hud-chrome-v1",
@@ -709,6 +733,22 @@
       "generatedHudChromeAssetsReady": 7,
       "generatedHudChromeCleanComposite": true,
       "generatedHudChromeCleanCompositeVersion": "hq17e_clean_hud_chrome_compositor_v1",
+      "generatedHudMaterialityPass": true,
+      "generatedHudMaterialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
+      "generatedHudMaterialityRendererOwned": true,
+      "generatedHudMaterialitySource": "procedural_canvas_textures",
+      "generatedHudMaterialityProfiles": true,
+      "generatedHudMaterialityText": true,
+      "generatedHudMaterialityCommands": true,
+      "generatedHudMaterialityChromeSlots": [
+        "crest-status",
+        "objective-loop",
+        "unit-dock",
+        "command-tray",
+        "collapsed-ledger",
+        "selected-context",
+        "command-puck"
+      ],
       "generatedHudChromeSourcePackRetained": true,
       "generatedHudChromePaintedSourceCrops": false,
       "generatedHudChromeSpritesVisualOnly": true,
@@ -733,6 +773,13 @@
       "generatedHudTextSpritesReadOnly": true,
       "generatedHudTextSpritesSelectable": false,
       "generatedHudTextAuthority": false,
+      "generatedHudCommandGlyphsInThreeLayer": true,
+      "generatedHudCommandGlyphSpriteCount": 1,
+      "generatedHudCommandGlyphLiveSource": "server_owned_command_hint",
+      "generatedHudCommandGlyphsVisualOnly": true,
+      "generatedHudCommandGlyphsReadOnly": true,
+      "generatedHudCommandGlyphsSelectable": false,
+      "generatedHudCommandGlyphAuthority": false,
       "serverTerrainAssetContractVersion": "agenttown_public_terrain_asset_slots_v1",
       "serverTerrainSlotSource": "server_read_model_v1",
       "assetBackedRegionTiles": 12,
@@ -814,7 +861,7 @@
     "commandTargets": [],
     "outpostNextFrontierBeacons": [
       {
-        "unitId": "expedition_unit_outpost_crew_claim_f2acc03eccc983df",
+        "unitId": "expedition_unit_outpost_crew_claim_80218853e882ece9",
         "unitType": "outpost_crew",
         "commandId": "scout_sector",
         "cueLabel": "Next Scout",
