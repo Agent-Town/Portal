@@ -1358,6 +1358,7 @@ const EXPEDITION_GENERATED_HUD_MASK_LAYER_VERSION = 'hq17d_three_masked_profiles
 const EXPEDITION_GENERATED_HUD_CLEAN_COMPOSITE_VERSION = 'hq17e_clean_hud_chrome_compositor_v1';
 const EXPEDITION_GENERATED_HUD_SINGLE_OWNER_VERSION = 'hq17f_single_owner_canvas_hud_v1';
 const EXPEDITION_GENERATED_HUD_MATERIALITY_VERSION = 'hq17g_renderer_owned_hud_materiality_v1';
+const EXPEDITION_GENERATED_HUD_WORLD_COHESION_VERSION = 'hq17h_renderer_hud_world_cohesion_v1';
 const EXPEDITION_PUBLIC_TERRAIN_CONTRACT_VERSION = 'agenttown_public_terrain_asset_slots_v1';
 const EXPEDITION_PUBLIC_TERRAIN_SLOT_SOURCE = 'server_read_model_v1';
 const EXPEDITION_ALLOWED_PUBLIC_TERRAIN_SLOTS = Object.freeze(['field', 'forest', 'ridge', 'settled']);
@@ -1416,10 +1417,10 @@ const EXPEDITION_MARKER_SPRITE_ASSETS = Object.freeze({
 const EXPEDITION_GENERATED_HUD_CHROME_ASSETS = Object.freeze([
   { slot: 'crest-status', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/crest-status.png`, anchor: 'top-left', widthRatio: 0.36, heightRatio: 0.14, marginX: 0.040, marginY: 0.016, opacity: 0.58 },
   { slot: 'objective-loop', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/objective-plaque.png`, anchor: 'top-left', widthRatio: 0.30, heightRatio: 0.12, marginX: 0.030, marginY: 0.166, opacity: 0.54 },
-  { slot: 'unit-dock', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/unit-dock.png`, anchor: 'bottom-left', widthRatio: 0.55, heightRatio: 0.195, marginX: 0.010, marginY: 0.010, opacity: 0.62 },
-  { slot: 'command-tray', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/command-tray.png`, anchor: 'bottom-right', widthRatio: 0.35, heightRatio: 0.175, marginX: 0.012, marginY: 0.014, opacity: 0.62 },
+  { slot: 'unit-dock', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/unit-dock.png`, anchor: 'bottom-left', widthRatio: 0.52, heightRatio: 0.188, marginX: 0.012, marginY: 0.012, opacity: 0.62 },
+  { slot: 'command-tray', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/command-tray.png`, anchor: 'bottom-right', widthRatio: 0.38, heightRatio: 0.188, marginX: 0.012, marginY: 0.012, opacity: 0.62 },
   { slot: 'collapsed-ledger', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/ledger-rail.png`, anchor: 'right', widthRatio: 0.058, heightRatio: 0.56, marginX: 0.008, marginY: 0.20, opacity: 0.58 },
-  { slot: 'selected-context', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/selected-context-frame.png`, anchor: 'bottom-right', widthRatio: 0.28, heightRatio: 0.12, marginX: 0.050, marginY: 0.188, opacity: 0.56 },
+  { slot: 'selected-context', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/selected-context-frame.png`, anchor: 'bottom-right', widthRatio: 0.30, heightRatio: 0.13, marginX: 0.040, marginY: 0.205, opacity: 0.58 },
   { slot: 'command-puck', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/command-puck.png`, anchor: 'selected-command', widthRatio: 0.070, heightRatio: 0.102, marginX: 0, marginY: 0, opacity: 0.60 }
 ]);
 const expeditionRegionTileImages = new Map();
@@ -3550,7 +3551,7 @@ function drawExpeditionHudPatina(ctx, width, height, alpha = 0.12) {
 }
 
 function expeditionHudSlotMaterial(slot = '') {
-  const darkHardware = ['crest-status', 'command-tray', 'command-puck', 'collapsed-ledger'].includes(slot);
+  const darkHardware = ['crest-status', 'command-tray', 'command-puck', 'collapsed-ledger', 'selected-context'].includes(slot);
   const bottomHardware = ['unit-dock', 'command-tray', 'command-puck'].includes(slot);
   return {
     darkHardware,
@@ -3713,7 +3714,7 @@ function makeExpeditionGeneratedHudTextTexture(item = {}) {
 
 function makeExpeditionCleanHudChromeTexture(asset = {}) {
   const slot = String(asset.slot || 'hud');
-  const key = `expedition-clean-hud-chrome:${EXPEDITION_GENERATED_HUD_MATERIALITY_VERSION}:${slot}`;
+  const key = `expedition-clean-hud-chrome:${EXPEDITION_GENERATED_HUD_MATERIALITY_VERSION}:${EXPEDITION_GENERATED_HUD_WORLD_COHESION_VERSION}:${slot}`;
   if (textureCache.has(key)) return textureCache.get(key);
   const vertical = slot === 'collapsed-ledger';
   const square = slot === 'command-puck';
@@ -3813,6 +3814,18 @@ function makeExpeditionCleanHudChromeTexture(asset = {}) {
     ctx.beginPath();
     ctx.arc(158, height / 2, 54, 0, Math.PI * 2);
     ctx.stroke();
+    ctx.strokeStyle = 'rgba(245, 212, 132, 0.30)';
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(width * 0.82, height * 0.40);
+    ctx.bezierCurveTo(width * 0.90, height * 0.44, width * 0.95, height * 0.58, width * 0.99, height * 0.62);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(12, 33, 30, 0.38)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(width * 0.84, height * 0.73);
+    ctx.lineTo(width * 0.98, height * 0.73);
+    ctx.stroke();
   } else if (slot === 'crest-status') {
     const cx = 156;
     const cy = height / 2;
@@ -3881,6 +3894,18 @@ function makeExpeditionCleanHudChromeTexture(asset = {}) {
     ctx.moveTo(width * 0.19, height * 0.78);
     ctx.lineTo(width * 0.72, height * 0.78);
     ctx.stroke();
+    ctx.strokeStyle = 'rgba(245, 212, 132, 0.32)';
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(width * 0.02, height * 0.62);
+    ctx.bezierCurveTo(width * 0.08, height * 0.58, width * 0.11, height * 0.46, width * 0.18, height * 0.42);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(130, 214, 208, 0.30)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(width * 0.04, height * 0.74);
+    ctx.lineTo(width * 0.20, height * 0.74);
+    ctx.stroke();
   } else if (slot === 'objective-loop') {
     ctx.strokeStyle = 'rgba(46, 27, 14, 0.44)';
     ctx.lineWidth = 4;
@@ -3907,8 +3932,124 @@ function makeExpeditionCleanHudChromeTexture(asset = {}) {
     ctx.moveTo(cx, cy - 64);
     ctx.lineTo(cx, cy + 64);
     ctx.stroke();
+    ctx.strokeStyle = 'rgba(245, 212, 132, 0.62)';
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.moveTo(width * 0.02, cy);
+    ctx.lineTo(width * 0.08, cy - 22);
+    ctx.lineTo(width * 0.08, cy + 22);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(245, 212, 132, 0.20)';
+    ctx.fill();
   }
   ctx.globalAlpha = 1;
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  textureCache.set(key, texture);
+  return texture;
+}
+
+function makeExpeditionHudWorldCohesionTexture(kind = 'depth-veil') {
+  const layer = String(kind || 'depth-veil');
+  const key = `expedition-hud-world-cohesion:${EXPEDITION_GENERATED_HUD_WORLD_COHESION_VERSION}:${layer}`;
+  if (textureCache.has(key)) return textureCache.get(key);
+  const canvas = document.createElement('canvas');
+  canvas.width = layer === 'bottom-bridge' ? 1024 : 768;
+  canvas.height = layer === 'bottom-bridge' ? 320 : 768;
+  const ctx = canvas.getContext('2d');
+  const width = canvas.width;
+  const height = canvas.height;
+  ctx.clearRect(0, 0, width, height);
+
+  if (layer === 'bottom-bridge') {
+    const fade = ctx.createLinearGradient(0, 0, 0, height);
+    fade.addColorStop(0, 'rgba(4, 16, 15, 0.00)');
+    fade.addColorStop(0.30, 'rgba(4, 16, 15, 0.08)');
+    fade.addColorStop(0.62, 'rgba(4, 16, 15, 0.34)');
+    fade.addColorStop(1, 'rgba(4, 16, 15, 0.58)');
+    ctx.fillStyle = fade;
+    ctx.fillRect(0, 0, width, height);
+
+    const deck = ctx.createLinearGradient(64, 128, width - 64, 262);
+    deck.addColorStop(0, 'rgba(12, 33, 30, 0.12)');
+    deck.addColorStop(0.18, 'rgba(10, 44, 41, 0.62)');
+    deck.addColorStop(0.52, 'rgba(78, 58, 32, 0.38)');
+    deck.addColorStop(0.82, 'rgba(10, 44, 41, 0.62)');
+    deck.addColorStop(1, 'rgba(12, 33, 30, 0.12)');
+    ctx.fillStyle = deck;
+    ctx.beginPath();
+    ctx.roundRect(58, 146, width - 116, 106, 42);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(245, 212, 132, 0.28)';
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.moveTo(88, 160);
+    ctx.bezierCurveTo(260, 110, 420, 170, 514, 186);
+    ctx.bezierCurveTo(620, 204, 746, 126, 936, 160);
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(130, 214, 208, 0.20)';
+    ctx.lineWidth = 3;
+    for (let index = 0; index < 11; index += 1) {
+      const x = 122 + (index * 82);
+      ctx.beginPath();
+      ctx.moveTo(x, 156);
+      ctx.lineTo(x + 36, 246);
+      ctx.stroke();
+    }
+
+    [118, 232, 784, 906].forEach((x, index) => drawExpeditionHudRivet(ctx, x, 204, index % 2 === 0 ? 8 : 6, index < 2));
+  } else if (layer === 'selected-aura') {
+    const glow = ctx.createRadialGradient(width / 2, height / 2, 8, width / 2, height / 2, width * 0.46);
+    glow.addColorStop(0, 'rgba(255, 248, 232, 0.34)');
+    glow.addColorStop(0.36, 'rgba(245, 212, 132, 0.18)');
+    glow.addColorStop(0.70, 'rgba(27, 106, 100, 0.10)');
+    glow.addColorStop(1, 'rgba(27, 106, 100, 0.00)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, width, height);
+
+    ctx.strokeStyle = 'rgba(245, 212, 132, 0.54)';
+    ctx.lineWidth = 7;
+    ctx.setLineDash([22, 15]);
+    ctx.beginPath();
+    ctx.arc(width / 2, height / 2, width * 0.30, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.strokeStyle = 'rgba(130, 214, 208, 0.38)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(width / 2, height / 2, width * 0.40, 0, Math.PI * 2);
+    ctx.stroke();
+  } else {
+    const vignette = ctx.createRadialGradient(width * 0.50, height * 0.48, width * 0.10, width * 0.50, height * 0.50, width * 0.72);
+    vignette.addColorStop(0, 'rgba(4, 16, 15, 0.00)');
+    vignette.addColorStop(0.50, 'rgba(4, 16, 15, 0.03)');
+    vignette.addColorStop(0.78, 'rgba(4, 16, 15, 0.13)');
+    vignette.addColorStop(1, 'rgba(4, 16, 15, 0.34)');
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, width, height);
+
+    const topLight = ctx.createLinearGradient(0, 0, width, height * 0.56);
+    topLight.addColorStop(0, 'rgba(255, 248, 232, 0.13)');
+    topLight.addColorStop(0.28, 'rgba(255, 248, 232, 0.04)');
+    topLight.addColorStop(1, 'rgba(255, 248, 232, 0.00)');
+    ctx.fillStyle = topLight;
+    ctx.fillRect(0, 0, width, height);
+
+    const sideShade = ctx.createLinearGradient(0, 0, width, 0);
+    sideShade.addColorStop(0, 'rgba(10, 44, 41, 0.20)');
+    sideShade.addColorStop(0.18, 'rgba(10, 44, 41, 0.04)');
+    sideShade.addColorStop(0.78, 'rgba(10, 44, 41, 0.03)');
+    sideShade.addColorStop(1, 'rgba(10, 44, 41, 0.20)');
+    ctx.fillStyle = sideShade;
+    ctx.fillRect(0, 0, width, height);
+  }
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -4408,6 +4549,8 @@ class ExpeditionMapThreeStage {
     this.eventMarkerSprites = [];
     this.objectiveMarkerSprites = [];
     this.outpostFrontierBeaconSprites = [];
+    this.generatedHudWorldCohesionSprites = [];
+    this.generatedHudWorldCohesionLines = [];
     this.generatedHudChromeSprites = [];
     this.generatedHudProfileSprites = [];
     this.generatedHudTextSprites = [];
@@ -4423,6 +4566,8 @@ class ExpeditionMapThreeStage {
     this.eventMarkerCount = 0;
     this.objectiveMarkerCount = 0;
     this.outpostFrontierBeaconCount = 0;
+    this.generatedHudWorldCohesionCount = 0;
+    this.generatedHudWorldTetherCount = 0;
     this.generatedHudChromeCount = 0;
     this.generatedHudProfileCount = 0;
     this.generatedHudTextCount = 0;
@@ -4512,6 +4657,8 @@ class ExpeditionMapThreeStage {
     this.eventMarkerSprites = [];
     this.objectiveMarkerSprites = [];
     this.outpostFrontierBeaconSprites = [];
+    this.generatedHudWorldCohesionSprites = [];
+    this.generatedHudWorldCohesionLines = [];
     this.generatedHudChromeSprites = [];
     this.generatedHudProfileSprites = [];
     this.generatedHudTextSprites = [];
@@ -4525,6 +4672,8 @@ class ExpeditionMapThreeStage {
     this.eventMarkerCount = 0;
     this.objectiveMarkerCount = 0;
     this.outpostFrontierBeaconCount = 0;
+    this.generatedHudWorldCohesionCount = 0;
+    this.generatedHudWorldTetherCount = 0;
     this.generatedHudChromeCount = 0;
     this.generatedHudProfileCount = 0;
     this.generatedHudTextCount = 0;
@@ -4553,8 +4702,16 @@ class ExpeditionMapThreeStage {
       this.camera.top = visibleHeight / 2;
       this.camera.bottom = visibleHeight / -2;
     }
+    this.camera.zoom = Math.max(this.camera.zoom, this.preferredHudWorldZoom(width, height));
     this.applyCameraBounds();
     this.render();
+  }
+
+  preferredHudWorldZoom(width = 0, height = 0) {
+    const aspect = Math.max(0.01, number(width, 0) / Math.max(1, number(height, 1)));
+    if (width <= 430 && aspect < 0.62) return 1.52;
+    if (width <= 560 && aspect < 0.75) return 1.34;
+    return 1;
   }
 
   sync(model = {}, selectedCellId = '', selectedUnitId = '', outcomeFeedback = null) {
@@ -4937,6 +5094,7 @@ class ExpeditionMapThreeStage {
         this.scene.add(sprite);
       });
     }
+    this.addGeneratedHudWorldCohesionLayer(layout);
     this.addGeneratedHudChromeLayer();
     this.addGeneratedHudContentLayer();
     this.updateInfo();
@@ -4947,6 +5105,122 @@ class ExpeditionMapThreeStage {
       width: Math.max(0.01, (this.camera.right - this.camera.left) / this.camera.zoom),
       height: Math.max(0.01, (this.camera.top - this.camera.bottom) / this.camera.zoom)
     };
+  }
+
+  addGeneratedHudWorldCohesionLayer(layout) {
+    this.generatedHudWorldCohesionSprites = [];
+    this.generatedHudWorldCohesionLines = [];
+    const addCohesionSprite = (slot, texture, opacity, renderOrder) => {
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        depthWrite: false,
+        depthTest: false,
+        opacity,
+        alphaTest: 0.01
+      }));
+      sprite.renderOrder = renderOrder;
+      sprite.userData = {
+        kind: 'expedition_generated_hud_world_cohesion',
+        layerVersion: EXPEDITION_GENERATED_HUD_WORLD_COHESION_VERSION,
+        slot,
+        visualOnly: true,
+        readOnly: true,
+        selectable: false,
+        routeAuthority: false,
+        actionAuthority: false,
+        executableActions: 0
+      };
+      this.generatedHudWorldCohesionSprites.push(sprite);
+      this.scene.add(sprite);
+      return sprite;
+    };
+
+    addCohesionSprite('map-depth-veil', makeExpeditionHudWorldCohesionTexture('depth-veil'), 0.82, 860);
+    addCohesionSprite('bottom-foreground-bridge', makeExpeditionHudWorldCohesionTexture('bottom-bridge'), 0.88, 872);
+
+    const selectedPosition = layout.positions.get(String(this.selectedCellId || ''));
+    if (selectedPosition) {
+      const aura = addCohesionSprite('selected-world-aura', makeExpeditionHudWorldCohesionTexture('selected-aura'), 0.86, 884);
+      aura.userData.cellId = String(this.selectedCellId || '');
+      aura.userData.worldX = selectedPosition.x;
+      aura.userData.worldY = selectedPosition.y;
+
+      const line = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(selectedPosition.x, selectedPosition.y, 4.12),
+          new THREE.Vector3(selectedPosition.x, selectedPosition.y, 4.12)
+        ]),
+        new THREE.LineBasicMaterial({
+          color: 0xf5d484,
+          transparent: true,
+          opacity: 0.50,
+          depthWrite: false,
+          depthTest: false
+        })
+      );
+      line.renderOrder = 892;
+      line.userData = {
+        kind: 'expedition_generated_hud_world_tether',
+        layerVersion: EXPEDITION_GENERATED_HUD_WORLD_COHESION_VERSION,
+        slot: 'selected-context-tether',
+        cellId: String(this.selectedCellId || ''),
+        startWorldX: selectedPosition.x,
+        startWorldY: selectedPosition.y,
+        targetSlot: 'selected-context',
+        visualOnly: true,
+        readOnly: true,
+        selectable: false,
+        routeAuthority: false,
+        actionAuthority: false,
+        executableActions: 0
+      };
+      this.generatedHudWorldCohesionLines.push(line);
+      this.scene.add(line);
+    }
+
+    this.generatedHudWorldCohesionCount = this.generatedHudWorldCohesionSprites.length + this.generatedHudWorldCohesionLines.length;
+    this.generatedHudWorldTetherCount = this.generatedHudWorldCohesionLines.length;
+    this.syncGeneratedHudWorldCohesionSprites();
+  }
+
+  syncGeneratedHudWorldCohesionSprites() {
+    if (!this.generatedHudWorldCohesionSprites.length && !this.generatedHudWorldCohesionLines.length) return;
+    const visible = this.visibleSize();
+    const bottom = this.camera.position.y - (visible.height / 2);
+    this.generatedHudWorldCohesionSprites.forEach((sprite) => {
+      const slot = String(sprite.userData?.slot || '');
+      if (slot === 'map-depth-veil') {
+        sprite.position.set(this.camera.position.x, this.camera.position.y, 4.02);
+        sprite.scale.set(visible.width * 1.04, visible.height * 1.04, 1);
+      } else if (slot === 'bottom-foreground-bridge') {
+        const height = clamp(visible.height * 0.30, 1.34, 2.44);
+        sprite.position.set(this.camera.position.x, bottom + (height / 2), 4.06);
+        sprite.scale.set(visible.width * 1.02, height, 1);
+      } else if (slot === 'selected-world-aura') {
+        sprite.position.set(number(sprite.userData?.worldX, 0), number(sprite.userData?.worldY, 0) + 0.08, 0.66);
+        sprite.scale.set(1.54, 1.54, 1);
+      }
+    });
+
+    const selectedContext = this.generatedHudBoundsForSlot('selected-context');
+    this.generatedHudWorldCohesionLines.forEach((line) => {
+      const startX = number(line.userData?.startWorldX, 0);
+      const startY = number(line.userData?.startWorldY, 0) + 0.10;
+      const endX = selectedContext.left + (selectedContext.width * 0.08);
+      const endY = selectedContext.top - (selectedContext.height * 0.50);
+      const midX = startX + ((endX - startX) * 0.56);
+      const midY = Math.max(startY, endY) + (Math.abs(endX - startX) * 0.035);
+      const curve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(startX, startY, 4.12),
+        new THREE.Vector3(midX, midY, 4.12),
+        new THREE.Vector3(endX, endY, 4.12)
+      ]);
+      line.geometry.dispose();
+      line.geometry = new THREE.BufferGeometry().setFromPoints(curve.getPoints(28));
+      line.userData.startCanvas = { x: startX, y: startY };
+      line.userData.endCanvas = { x: endX, y: endY };
+    });
   }
 
   addGeneratedHudChromeLayer() {
@@ -5101,7 +5375,7 @@ class ExpeditionMapThreeStage {
       { slot: 'objective-loop', title: expeditionHudObjectiveLabel(this.model), meta: objective.targetCellId ? expeditionHudShortCellLabel(objective.targetCellId) : 'READY', tone: 'dark' },
       { slot: 'unit-dock', title: `${units.length} UNITS`, meta: selectedUnit ? expeditionHudUnitLabel(selectedUnit) : 'SELECT', tone: 'dark' },
       { slot: 'command-puck', title: commandCount ? `${commandCount} CMD` : 'CMD', meta: selectedUnit ? expeditionHudUnitLabel(selectedUnit) : 'READY', tone: 'light' },
-      { slot: 'selected-context', title: expeditionHudShortCellLabel(selectedCell.cellId || this.selectedCellId), meta: String(selectedCell.fogState || 'sector').replace(/_/g, ' '), tone: 'dark' }
+      { slot: 'selected-context', title: expeditionHudShortCellLabel(selectedCell.cellId || this.selectedCellId), meta: String(selectedCell.fogState || 'sector').replace(/_/g, ' '), tone: 'light' }
     ];
     textItems.forEach((item, index) => {
       const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -5273,7 +5547,8 @@ class ExpeditionMapThreeStage {
   }
 
   resetView() {
-    this.camera.zoom = 1;
+    const rect = this.hostNode.getBoundingClientRect();
+    this.camera.zoom = this.preferredHudWorldZoom(rect.width, rect.height);
     this.camera.position.x = this.mapBounds.centerX;
     this.camera.position.y = this.mapBounds.centerY;
     this.applyCameraBounds();
@@ -5430,6 +5705,7 @@ class ExpeditionMapThreeStage {
   }
 
   updateInfo() {
+    this.syncGeneratedHudWorldCohesionSprites();
     this.syncGeneratedHudChromeSprites();
     this.syncGeneratedHudContentSprites();
     const canvas = this.renderer.domElement;
@@ -5475,6 +5751,32 @@ class ExpeditionMapThreeStage {
     const generatedSpriteAssetReadyCount = generatedSpriteAssets
       .filter((asset) => !!ensureExpeditionRegionTileImage(asset))
       .length;
+    const generatedHudWorldCohesionSprites = this.generatedHudWorldCohesionSprites.map((sprite) => ({
+      slot: String(sprite.userData?.slot || ''),
+      layerVersion: String(sprite.userData?.layerVersion || ''),
+      cellId: String(sprite.userData?.cellId || ''),
+      visualOnly: sprite.userData?.visualOnly === true,
+      readOnly: sprite.userData?.readOnly === true,
+      selectable: sprite.userData?.selectable === true,
+      routeAuthority: sprite.userData?.routeAuthority === true,
+      actionAuthority: sprite.userData?.actionAuthority === true,
+      executableActions: Number(sprite.userData?.executableActions || 0),
+      canvas: this.canvasPointForObject(sprite)
+    }));
+    const generatedHudWorldCohesionLines = this.generatedHudWorldCohesionLines.map((line) => ({
+      slot: String(line.userData?.slot || ''),
+      layerVersion: String(line.userData?.layerVersion || ''),
+      cellId: String(line.userData?.cellId || ''),
+      targetSlot: String(line.userData?.targetSlot || ''),
+      visualOnly: line.userData?.visualOnly === true,
+      readOnly: line.userData?.readOnly === true,
+      selectable: line.userData?.selectable === true,
+      routeAuthority: line.userData?.routeAuthority === true,
+      actionAuthority: line.userData?.actionAuthority === true,
+      executableActions: Number(line.userData?.executableActions || 0),
+      startCanvas: line.userData?.startCanvas || null,
+      endCanvas: line.userData?.endCanvas || null
+    }));
     const generatedHudChromeSprites = this.generatedHudChromeSprites.map((sprite) => ({
       slot: String(sprite.userData?.slot || ''),
       packId: String(sprite.userData?.packId || ''),
@@ -5616,6 +5918,26 @@ class ExpeditionMapThreeStage {
           generatedHudMaterialityVersion: EXPEDITION_GENERATED_HUD_MATERIALITY_VERSION,
           generatedHudMaterialityRendererOwned: true,
           generatedHudMaterialitySource: 'procedural_canvas_textures',
+          generatedHudWorldCohesionPass: true,
+          generatedHudWorldCohesionVersion: EXPEDITION_GENERATED_HUD_WORLD_COHESION_VERSION,
+          generatedHudWorldCohesionSource: 'procedural_canvas_textures_and_three_lines',
+          generatedHudWorldCohesionRendererOwned: true,
+          generatedHudWorldCohesionSpriteCount: generatedHudWorldCohesionSprites.length,
+          generatedHudWorldCohesionLineCount: generatedHudWorldCohesionLines.length,
+          generatedHudWorldCohesionSlots: [
+            ...generatedHudWorldCohesionSprites.map((sprite) => sprite.slot),
+            ...generatedHudWorldCohesionLines.map((line) => line.slot)
+          ],
+          generatedHudWorldDepthSeparation: generatedHudWorldCohesionSprites.some((sprite) => sprite.slot === 'map-depth-veil'),
+          generatedHudForegroundBridge: generatedHudWorldCohesionSprites.some((sprite) => sprite.slot === 'bottom-foreground-bridge'),
+          generatedHudSelectedWorldAura: generatedHudWorldCohesionSprites.some((sprite) => sprite.slot === 'selected-world-aura'),
+          generatedHudSelectedContextTether: generatedHudWorldCohesionLines.some((line) => line.slot === 'selected-context-tether'),
+          generatedHudWorldCohesionVisualOnly: [...generatedHudWorldCohesionSprites, ...generatedHudWorldCohesionLines].every((entry) => entry.visualOnly),
+          generatedHudWorldCohesionReadOnly: [...generatedHudWorldCohesionSprites, ...generatedHudWorldCohesionLines].every((entry) => entry.readOnly),
+          generatedHudWorldCohesionSelectable: [...generatedHudWorldCohesionSprites, ...generatedHudWorldCohesionLines].some((entry) => entry.selectable),
+          generatedHudWorldCohesionAuthority: [...generatedHudWorldCohesionSprites, ...generatedHudWorldCohesionLines].some((entry) => entry.routeAuthority || entry.actionAuthority || entry.executableActions > 0),
+          generatedHudBottomDockTrayBalanced: true,
+          generatedHudSelectedContextWorldConnection: generatedHudWorldCohesionLines.some((line) => line.targetSlot === 'selected-context'),
           generatedHudMaterialityProfiles: generatedHudProfileSprites.every((sprite) => sprite.materialityVersion === EXPEDITION_GENERATED_HUD_MATERIALITY_VERSION),
           generatedHudMaterialityText: generatedHudTextSprites.every((sprite) => sprite.materialityVersion === EXPEDITION_GENERATED_HUD_MATERIALITY_VERSION),
           generatedHudMaterialityCommands: generatedHudCommandSprites.every((sprite) => sprite.materialityVersion === EXPEDITION_GENERATED_HUD_MATERIALITY_VERSION),
@@ -5736,6 +6058,8 @@ class ExpeditionMapThreeStage {
         commandOutcomeFeedbackAuthority: false,
         clientAuthority: false
       },
+      generatedHudWorldCohesionSprites,
+      generatedHudWorldCohesionLines,
       generatedHudChromeSprites,
       generatedHudProfileSprites,
       generatedHudTextSprites,

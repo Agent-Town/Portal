@@ -4620,7 +4620,12 @@ html, body {
 .fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-outpost-status,
 .fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-outpost-status__next-cue,
 .fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-ledger-rail,
-.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-unit-command-bar {
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-unit-command-bar,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-survey-bridge,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-command-preview,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-command-outcome,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-location-visit__scene,
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-location-visit__facts {
   background: transparent !important;
   border-color: transparent !important;
   box-shadow: none !important;
@@ -4652,6 +4657,14 @@ html, body {
 .fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-location-visit :where(strong, small, span, p, b, i, em),
 .fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-outpost-status :where(strong, small, span, p, b, i, em),
 .fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-ledger-rail :where(strong, small, span, p, b, i, em),
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-hud-objective :where(button),
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-map-visual-hud :where(button),
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-map-selected-summary :where(button),
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-survey-bridge :where(strong, small, span, p, b, i, em, button),
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-command-preview :where(strong, small, span, p, b, i, em, button),
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-command-outcome :where(strong, small, span, p, b, i, em, button),
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-location-visit__scene :where(strong, small, span, p, b, i, em, button),
+.fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-location-visit__facts :where(strong, small, span, p, b, i, em, button),
 .fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-unit-command-bar :where(button, span, small),
 .fp-expedition-map-body--hq17f-single-owner-canvas-hud .fp-expedition-unit-command-bar__button {
   background: transparent !important;

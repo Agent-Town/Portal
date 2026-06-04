@@ -390,6 +390,28 @@
         "generatedHudMaterialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
         "generatedHudMaterialityRendererOwned": true,
         "generatedHudMaterialitySource": "procedural_canvas_textures",
+        "generatedHudWorldCohesionPass": true,
+        "generatedHudWorldCohesionVersion": "hq17h_renderer_hud_world_cohesion_v1",
+        "generatedHudWorldCohesionSource": "procedural_canvas_textures_and_three_lines",
+        "generatedHudWorldCohesionRendererOwned": true,
+        "generatedHudWorldCohesionSpriteCount": 3,
+        "generatedHudWorldCohesionLineCount": 1,
+        "generatedHudWorldCohesionSlots": [
+          "map-depth-veil",
+          "bottom-foreground-bridge",
+          "selected-world-aura",
+          "selected-context-tether"
+        ],
+        "generatedHudWorldDepthSeparation": true,
+        "generatedHudForegroundBridge": true,
+        "generatedHudSelectedWorldAura": true,
+        "generatedHudSelectedContextTether": true,
+        "generatedHudWorldCohesionVisualOnly": true,
+        "generatedHudWorldCohesionReadOnly": true,
+        "generatedHudWorldCohesionSelectable": false,
+        "generatedHudWorldCohesionAuthority": false,
+        "generatedHudBottomDockTrayBalanced": true,
+        "generatedHudSelectedContextWorldConnection": true,
         "generatedHudMaterialityProfiles": true,
         "generatedHudMaterialityText": true,
         "generatedHudMaterialityCommands": true,
@@ -577,8 +599,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 349.98,
-            "y": 699.7199999999999
+            "x": 334.016,
+            "y": 700.896
           }
         },
         {
@@ -600,8 +622,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 998.3639999999999,
-            "y": 704.424
+            "x": 979.9440000000001,
+            "y": 700.896
           }
         },
         {
@@ -647,7 +669,7 @@
           "executableActions": 0,
           "canvas": {
             "x": 994.6800000000001,
-            "y": 589.568
+            "y": 572.3199999999999
           }
         },
         {
@@ -693,8 +715,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 329.718,
-            "y": 692.0759999999999
+            "x": 314.85919999999993,
+            "y": 693.5264
           }
         },
         {
@@ -715,8 +737,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 427.65100000000007,
-            "y": 692.0759999999999
+            "x": 407.4504,
+            "y": 693.5264
           }
         },
         {
@@ -737,8 +759,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 525.5840000000001,
-            "y": 692.0759999999999
+            "x": 500.04159999999996,
+            "y": 693.5264
           }
         }
       ],
@@ -796,8 +818,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 221.654,
-            "y": 689.0183999999999
+            "x": 212.68959999999996,
+            "y": 690.5785599999999
           }
         },
         {
@@ -815,8 +837,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 1067.132,
-            "y": 701.68
+            "x": 1054.6064000000001,
+            "y": 697.9481599999999
           }
         },
         {
@@ -834,8 +856,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 1015.3104,
-            "y": 589.568
+            "x": 1016.7840000000001,
+            "y": 572.3199999999999
           }
         }
       ],
@@ -856,8 +878,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 895.2120000000001,
-            "y": 701.6800000000001
+            "x": 867.9504,
+            "y": 697.9481599999999
           }
         },
         {
@@ -876,8 +898,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 974.7069411764707,
-            "y": 701.6800000000001
+            "x": 947.4453411764705,
+            "y": 697.9481599999999
           }
         }
       ],
@@ -937,8 +959,8 @@
           "executableActions": 0,
           "noAuthority": true,
           "canvas": {
-            "x": 349.98,
-            "y": 699.7199999999999
+            "x": 334.016,
+            "y": 700.896
           },
           "viewportContained": true
         },
@@ -957,8 +979,8 @@
           "executableActions": 0,
           "noAuthority": true,
           "canvas": {
-            "x": 998.3639999999999,
-            "y": 704.424
+            "x": 979.9440000000001,
+            "y": 700.896
           },
           "viewportContained": true
         },
@@ -998,7 +1020,7 @@
           "noAuthority": true,
           "canvas": {
             "x": 994.6800000000001,
-            "y": 589.568
+            "y": 572.3199999999999
           },
           "viewportContained": true
         },
@@ -1378,6 +1400,28 @@
         "generatedHudMaterialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
         "generatedHudMaterialityRendererOwned": true,
         "generatedHudMaterialitySource": "procedural_canvas_textures",
+        "generatedHudWorldCohesionPass": true,
+        "generatedHudWorldCohesionVersion": "hq17h_renderer_hud_world_cohesion_v1",
+        "generatedHudWorldCohesionSource": "procedural_canvas_textures_and_three_lines",
+        "generatedHudWorldCohesionRendererOwned": true,
+        "generatedHudWorldCohesionSpriteCount": 3,
+        "generatedHudWorldCohesionLineCount": 1,
+        "generatedHudWorldCohesionSlots": [
+          "map-depth-veil",
+          "bottom-foreground-bridge",
+          "selected-world-aura",
+          "selected-context-tether"
+        ],
+        "generatedHudWorldDepthSeparation": true,
+        "generatedHudForegroundBridge": true,
+        "generatedHudSelectedWorldAura": true,
+        "generatedHudSelectedContextTether": true,
+        "generatedHudWorldCohesionVisualOnly": true,
+        "generatedHudWorldCohesionReadOnly": true,
+        "generatedHudWorldCohesionSelectable": false,
+        "generatedHudWorldCohesionAuthority": false,
+        "generatedHudBottomDockTrayBalanced": true,
+        "generatedHudSelectedContextWorldConnection": true,
         "generatedHudMaterialityProfiles": true,
         "generatedHudMaterialityText": true,
         "generatedHudMaterialityCommands": true,
@@ -1519,7 +1563,7 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 79.63999999999999,
+            "x": 79.64000000000001,
             "y": 64.67199999999997
           }
         },
@@ -1543,7 +1587,7 @@
           "executableActions": 0,
           "canvas": {
             "x": 65.16000000000001,
-            "y": 169.95200000000003
+            "y": 169.952
           }
         },
         {
@@ -1565,8 +1609,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 103.17000000000002,
-            "y": 671.16
+            "x": 98.46400000000003,
+            "y": 672.288
           }
         },
         {
@@ -1588,8 +1632,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 294.306,
-            "y": 675.672
+            "x": 288.876,
+            "y": 672.288
           }
         },
         {
@@ -1612,7 +1656,7 @@
           "executableActions": 0,
           "canvas": {
             "x": 348.60600000000005,
-            "y": 360.9600000000001
+            "y": 360.96000000000004
           }
         },
         {
@@ -1635,7 +1679,7 @@
           "executableActions": 0,
           "canvas": {
             "x": 293.22,
-            "y": 565.504
+            "y": 548.96
           }
         },
         {
@@ -1681,8 +1725,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 97.197,
-            "y": 663.828
+            "x": 92.81680000000003,
+            "y": 665.2192
           }
         },
         {
@@ -1703,8 +1747,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 126.06650000000002,
-            "y": 663.828
+            "x": 126.02540235294121,
+            "y": 665.2192
           }
         },
         {
@@ -1725,8 +1769,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 154.936,
-            "y": 663.828
+            "x": 159.23400470588237,
+            "y": 665.2192
           }
         }
       ],
@@ -1746,7 +1790,7 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 95.27839999999999,
+            "x": 95.27840000000002,
             "y": 64.67199999999997
           }
         },
@@ -1766,7 +1810,7 @@
           "executableActions": 0,
           "canvas": {
             "x": 69.50400000000002,
-            "y": 169.95200000000003
+            "y": 169.952
           }
         },
         {
@@ -1784,8 +1828,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 65.341,
-            "y": 660.8952
+            "x": 62.69840000000003,
+            "y": 662.3916800000001
           }
         },
         {
@@ -1803,8 +1847,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 314.578,
-            "y": 673.04
+            "x": 310.8856,
+            "y": 669.4604800000001
           }
         },
         {
@@ -1822,8 +1866,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 299.3016,
-            "y": 565.504
+            "x": 299.73600000000005,
+            "y": 548.96
           }
         }
       ],
@@ -1844,8 +1888,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 263.898,
-            "y": 673.04
+            "x": 255.86159999999995,
+            "y": 669.4604800000001
           }
         },
         {
@@ -1864,8 +1908,8 @@
           "actionAuthority": false,
           "executableActions": 0,
           "canvas": {
-            "x": 287.33217647058825,
-            "y": 673.04
+            "x": 286.4304888888889,
+            "y": 669.4604800000001
           }
         }
       ],
@@ -1885,7 +1929,7 @@
           "executableActions": 0,
           "noAuthority": true,
           "canvas": {
-            "x": 79.63999999999999,
+            "x": 79.64000000000001,
             "y": 64.67199999999997
           },
           "viewportContained": true
@@ -1906,7 +1950,7 @@
           "noAuthority": true,
           "canvas": {
             "x": 65.16000000000001,
-            "y": 169.95200000000003
+            "y": 169.952
           },
           "viewportContained": true
         },
@@ -1925,8 +1969,8 @@
           "executableActions": 0,
           "noAuthority": true,
           "canvas": {
-            "x": 103.17000000000002,
-            "y": 671.16
+            "x": 98.46400000000003,
+            "y": 672.288
           },
           "viewportContained": true
         },
@@ -1945,8 +1989,8 @@
           "executableActions": 0,
           "noAuthority": true,
           "canvas": {
-            "x": 294.306,
-            "y": 675.672
+            "x": 288.876,
+            "y": 672.288
           },
           "viewportContained": true
         },
@@ -1966,7 +2010,7 @@
           "noAuthority": true,
           "canvas": {
             "x": 348.60600000000005,
-            "y": 360.9600000000001
+            "y": 360.96000000000004
           },
           "viewportContained": true
         },
@@ -1986,7 +2030,7 @@
           "noAuthority": true,
           "canvas": {
             "x": 293.22,
-            "y": 565.504
+            "y": 548.96
           },
           "viewportContained": true
         },

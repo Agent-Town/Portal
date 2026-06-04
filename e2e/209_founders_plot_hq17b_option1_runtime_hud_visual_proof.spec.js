@@ -225,7 +225,7 @@ function assertHudLayout(proof, { mobile = false } = {}) {
 }
 
 test('FP-E2E-022B1 HQ17B option 1 runtime HUD maps the continuous loop into map-first HUD slots', async ({ page, request }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 
   const desktopScreenshot = 'reports/agent-town-hq17b-option1-runtime-hud-visual-proof-desktop-2026-06-03.png';

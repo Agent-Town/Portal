@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "generatedAt": "2026-06-03T13:32:44.820Z",
+  "generatedAt": "2026-06-03T14:34:15.702Z",
   "title": "HQ17B Option 1 runtime HUD visual proof",
   "source": "FP-E2E-022B1 continuous guarded endpoint replay with HQ17B DOM/CSS HUD slot assertions.",
   "branch": "neo/progression-atlas-editor-next-2026-05-29",
@@ -12,7 +12,7 @@
     "firstScout": {
       "endpointUsed": "et.plot.scout_sector",
       "revealedCellId": "cell_q1_r0",
-      "packetId": "expedition_event_packet_1f4c6da526288502",
+      "packetId": "expedition_event_packet_977341c8882c8458",
       "boundaryFlags": {
         "samePlotOnly": true,
         "serverOwnedDiscoveryReceipt": true,
@@ -33,8 +33,8 @@
     },
     "packetPlan": {
       "endpointUsed": "et.plot.draft_site_plan_from_packet",
-      "planId": "site_plan_expedition_event_packet_1f4c6da526288502",
-      "packetId": "expedition_event_packet_1f4c6da526288502",
+      "planId": "site_plan_expedition_event_packet_977341c8882c8458",
+      "packetId": "expedition_event_packet_977341c8882c8458",
       "boundaryFlags": {
         "samePlotOnly": true,
         "createsSitePlan": true,
@@ -62,18 +62,18 @@
     },
     "review": {
       "endpointUsed": "et.plot.review_site_plan",
-      "planId": "site_plan_expedition_event_packet_1f4c6da526288502",
+      "planId": "site_plan_expedition_event_packet_977341c8882c8458",
       "reviewStatus": "reviewed"
     },
     "prepareConvoy": {
       "endpointUsed": "et.plot.prepare_settler_convoy",
-      "claimId": "claim_80218853e882ece9",
+      "claimId": "claim_f18726b676756116",
       "status": "CONVOY_PREPARING"
     },
     "foundOutpost": {
       "endpointUsed": "et.plot.found_settlement",
-      "claimId": "claim_80218853e882ece9",
-      "foundedPlotId": "plot_3042544f12aaa616"
+      "claimId": "claim_f18726b676756116",
+      "foundedPlotId": "plot_0f684ff3f4ba8806"
     }
   },
   "hudProof": {
@@ -737,6 +737,28 @@
       "generatedHudMaterialityVersion": "hq17g_renderer_owned_hud_materiality_v1",
       "generatedHudMaterialityRendererOwned": true,
       "generatedHudMaterialitySource": "procedural_canvas_textures",
+      "generatedHudWorldCohesionPass": true,
+      "generatedHudWorldCohesionVersion": "hq17h_renderer_hud_world_cohesion_v1",
+      "generatedHudWorldCohesionSource": "procedural_canvas_textures_and_three_lines",
+      "generatedHudWorldCohesionRendererOwned": true,
+      "generatedHudWorldCohesionSpriteCount": 3,
+      "generatedHudWorldCohesionLineCount": 1,
+      "generatedHudWorldCohesionSlots": [
+        "map-depth-veil",
+        "bottom-foreground-bridge",
+        "selected-world-aura",
+        "selected-context-tether"
+      ],
+      "generatedHudWorldDepthSeparation": true,
+      "generatedHudForegroundBridge": true,
+      "generatedHudSelectedWorldAura": true,
+      "generatedHudSelectedContextTether": true,
+      "generatedHudWorldCohesionVisualOnly": true,
+      "generatedHudWorldCohesionReadOnly": true,
+      "generatedHudWorldCohesionSelectable": false,
+      "generatedHudWorldCohesionAuthority": false,
+      "generatedHudBottomDockTrayBalanced": true,
+      "generatedHudSelectedContextWorldConnection": true,
       "generatedHudMaterialityProfiles": true,
       "generatedHudMaterialityText": true,
       "generatedHudMaterialityCommands": true,
@@ -861,7 +883,7 @@
     "commandTargets": [],
     "outpostNextFrontierBeacons": [
       {
-        "unitId": "expedition_unit_outpost_crew_claim_80218853e882ece9",
+        "unitId": "expedition_unit_outpost_crew_claim_f18726b676756116",
         "unitType": "outpost_crew",
         "commandId": "scout_sector",
         "cueLabel": "Next Scout",
