@@ -1359,6 +1359,8 @@ const EXPEDITION_GENERATED_HUD_CLEAN_COMPOSITE_VERSION = 'hq17e_clean_hud_chrome
 const EXPEDITION_GENERATED_HUD_SINGLE_OWNER_VERSION = 'hq17f_single_owner_canvas_hud_v1';
 const EXPEDITION_GENERATED_HUD_MATERIALITY_VERSION = 'hq17g_renderer_owned_hud_materiality_v1';
 const EXPEDITION_GENERATED_HUD_WORLD_COHESION_VERSION = 'hq17h_renderer_hud_world_cohesion_v1';
+const EXPEDITION_FRONTIER_LEDGER_SCRATCH_VERSION = 'hq18_frontier_ledger_scratch_visual_hud_v1';
+const EXPEDITION_FRONTIER_LEDGER_NORTH_STAR_PATH = 'frontier-ledger-north-star-upload-2026-06-05';
 const EXPEDITION_PUBLIC_TERRAIN_CONTRACT_VERSION = 'agenttown_public_terrain_asset_slots_v1';
 const EXPEDITION_PUBLIC_TERRAIN_SLOT_SOURCE = 'server_read_model_v1';
 const EXPEDITION_ALLOWED_PUBLIC_TERRAIN_SLOTS = Object.freeze(['field', 'forest', 'ridge', 'settled']);
@@ -1415,13 +1417,13 @@ const EXPEDITION_MARKER_SPRITE_ASSETS = Object.freeze({
   receipt_ledger: { slot: 'receipt_ledger', path: `${EXPEDITION_SPRITE_ASSET_BASE}/receipt-ledger-v1.png`, assetKind: 'generated_marker_sprite' }
 });
 const EXPEDITION_GENERATED_HUD_CHROME_ASSETS = Object.freeze([
-  { slot: 'crest-status', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/crest-status.png`, anchor: 'top-left', widthRatio: 0.36, heightRatio: 0.14, marginX: 0.040, marginY: 0.016, opacity: 0.58 },
-  { slot: 'objective-loop', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/objective-plaque.png`, anchor: 'top-left', widthRatio: 0.30, heightRatio: 0.12, marginX: 0.030, marginY: 0.166, opacity: 0.54 },
-  { slot: 'unit-dock', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/unit-dock.png`, anchor: 'bottom-left', widthRatio: 0.52, heightRatio: 0.188, marginX: 0.012, marginY: 0.012, opacity: 0.62 },
-  { slot: 'command-tray', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/command-tray.png`, anchor: 'bottom-right', widthRatio: 0.38, heightRatio: 0.188, marginX: 0.012, marginY: 0.012, opacity: 0.62 },
-  { slot: 'collapsed-ledger', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/ledger-rail.png`, anchor: 'right', widthRatio: 0.058, heightRatio: 0.56, marginX: 0.008, marginY: 0.20, opacity: 0.58 },
-  { slot: 'selected-context', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/selected-context-frame.png`, anchor: 'bottom-right', widthRatio: 0.30, heightRatio: 0.13, marginX: 0.040, marginY: 0.205, opacity: 0.58 },
-  { slot: 'command-puck', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/command-puck.png`, anchor: 'selected-command', widthRatio: 0.070, heightRatio: 0.102, marginX: 0, marginY: 0, opacity: 0.60 }
+  { slot: 'crest-status', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/crest-status.png`, anchor: 'top-left', widthRatio: 0.285, heightRatio: 0.092, marginX: 0.006, marginY: 0.014, opacity: 0.82 },
+  { slot: 'objective-loop', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/objective-plaque.png`, anchor: 'top-left', widthRatio: 0.148, heightRatio: 0.068, marginX: 0.206, marginY: 0.032, opacity: 0.82 },
+  { slot: 'unit-dock', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/unit-dock.png`, anchor: 'bottom-left', widthRatio: 0.575, heightRatio: 0.225, marginX: 0.000, marginY: 0.000, opacity: 0.88 },
+  { slot: 'command-tray', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/command-tray.png`, anchor: 'bottom-right', widthRatio: 0.372, heightRatio: 0.245, marginX: 0.010, marginY: 0.010, opacity: 0.90 },
+  { slot: 'collapsed-ledger', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/ledger-rail.png`, anchor: 'right', widthRatio: 0.070, heightRatio: 0.50, marginX: 0.000, marginY: 0.18, opacity: 0.88 },
+  { slot: 'selected-context', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/selected-context-frame.png`, anchor: 'bottom-right', widthRatio: 0.190, heightRatio: 0.178, marginX: 0.036, marginY: 0.258, opacity: 0.90 },
+  { slot: 'command-puck', path: `${EXPEDITION_GENERATED_HUD_CHROME_BASE}/command-puck.png`, anchor: 'selected-command', widthRatio: 0.078, heightRatio: 0.112, marginX: 0, marginY: 0, opacity: 0.82 }
 ]);
 const expeditionRegionTileImages = new Map();
 const expeditionRegionTileListeners = new Set();
@@ -1436,8 +1438,9 @@ function expeditionGeneratedHudChromeAssets(model = {}) {
       const fallback = EXPEDITION_GENERATED_HUD_CHROME_ASSETS
         .find((entry) => String(entry.slot || '') === String(asset.slot || '')) || {};
       return {
-        ...fallback,
         ...asset,
+        ...fallback,
+        path: String(asset.path || fallback.path || ''),
         packId: String(model.generatedHudChrome?.packId || asset.packId || EXPEDITION_GENERATED_HUD_CHROME_PACK_ID),
         visualOnly: true,
         readOnly: true,
@@ -3550,21 +3553,101 @@ function drawExpeditionHudPatina(ctx, width, height, alpha = 0.12) {
   ctx.restore();
 }
 
+function drawExpeditionFrontierWoodgrain(ctx, width, height, alpha = 0.18) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  for (let index = 0; index < 34; index += 1) {
+    const y = ((index * 37) % Math.max(1, height)) + ((index % 3) - 1) * 4;
+    const wave = 16 + (index % 5) * 7;
+    ctx.strokeStyle = index % 2 === 0 ? 'rgba(255, 214, 138, 0.42)' : 'rgba(32, 17, 9, 0.54)';
+    ctx.lineWidth = 1 + (index % 4);
+    ctx.beginPath();
+    ctx.moveTo(-20, y);
+    for (let x = 0; x <= width + 40; x += 90) {
+      ctx.bezierCurveTo(x + 20, y - wave, x + 64, y + wave, x + 90, y + ((index % 2) ? -5 : 5));
+    }
+    ctx.stroke();
+  }
+  for (let index = 0; index < 80; index += 1) {
+    const x = (index * 131 + 17) % width;
+    const y = (index * 71 + 33) % height;
+    ctx.fillStyle = index % 3 === 0 ? 'rgba(255, 248, 232, 0.32)' : 'rgba(18, 9, 4, 0.35)';
+    ctx.fillRect(x, y, 1 + (index % 5), 1);
+  }
+  ctx.restore();
+}
+
+function drawExpeditionFrontierTornPaper(ctx, x, y, width, height, radius = 18) {
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y + 5);
+  ctx.lineTo(x + width * 0.28, y + 1);
+  ctx.lineTo(x + width * 0.34, y + 7);
+  ctx.lineTo(x + width * 0.58, y + 3);
+  ctx.lineTo(x + width - radius, y + 8);
+  ctx.quadraticCurveTo(x + width - 3, y + 8, x + width - 5, y + radius);
+  ctx.lineTo(x + width - 2, y + height * 0.38);
+  ctx.lineTo(x + width - 9, y + height * 0.45);
+  ctx.lineTo(x + width - 4, y + height - radius);
+  ctx.quadraticCurveTo(x + width - 4, y + height - 3, x + width - radius, y + height - 5);
+  ctx.lineTo(x + width * 0.66, y + height - 1);
+  ctx.lineTo(x + width * 0.57, y + height - 8);
+  ctx.lineTo(x + width * 0.22, y + height - 4);
+  ctx.lineTo(x + radius, y + height - 9);
+  ctx.quadraticCurveTo(x + 3, y + height - 8, x + 7, y + height - radius);
+  ctx.lineTo(x + 2, y + height * 0.54);
+  ctx.lineTo(x + 9, y + height * 0.47);
+  ctx.lineTo(x + 4, y + radius);
+  ctx.quadraticCurveTo(x + 3, y + 6, x + radius, y + 5);
+  ctx.closePath();
+}
+
+function drawExpeditionFrontierCompassRose(ctx, cx, cy, radius, color = 'rgba(245, 212, 132, 0.78)') {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = Math.max(2, radius * 0.07);
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  for (let index = 0; index < 8; index += 1) {
+    const angle = (Math.PI * 2 * index) / 8;
+    const long = index % 2 === 0 ? radius * 0.88 : radius * 0.62;
+    ctx.moveTo(Math.cos(angle) * radius * 0.22, Math.sin(angle) * radius * 0.22);
+    ctx.lineTo(Math.cos(angle) * long, Math.sin(angle) * long);
+  }
+  ctx.stroke();
+  ctx.rotate(-0.48);
+  ctx.beginPath();
+  ctx.moveTo(0, -radius * 0.72);
+  ctx.lineTo(radius * 0.16, 0);
+  ctx.lineTo(0, radius * 0.34);
+  ctx.lineTo(-radius * 0.16, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
 function expeditionHudSlotMaterial(slot = '') {
-  const darkHardware = ['crest-status', 'command-tray', 'command-puck', 'collapsed-ledger', 'selected-context'].includes(slot);
+  const darkHardware = ['crest-status', 'objective-loop', 'command-tray', 'command-puck', 'collapsed-ledger'].includes(slot);
   const bottomHardware = ['unit-dock', 'command-tray', 'command-puck'].includes(slot);
+  const parchment = slot === 'selected-context';
+  const wood = slot === 'unit-dock';
   return {
     darkHardware,
     bottomHardware,
-    outerA: darkHardware ? 'rgba(10, 44, 41, 0.96)' : 'rgba(78, 58, 32, 0.86)',
-    outerB: darkHardware ? 'rgba(23, 90, 84, 0.92)' : 'rgba(183, 142, 70, 0.76)',
-    outerC: darkHardware ? 'rgba(45, 31, 18, 0.92)' : 'rgba(18, 58, 52, 0.72)',
-    insetA: darkHardware ? 'rgba(16, 45, 41, 0.76)' : 'rgba(255, 248, 232, 0.72)',
-    insetB: darkHardware ? 'rgba(41, 69, 58, 0.64)' : 'rgba(222, 201, 143, 0.62)',
-    strokeA: 'rgba(245, 212, 132, 0.78)',
-    strokeB: darkHardware ? 'rgba(130, 214, 208, 0.34)' : 'rgba(46, 27, 14, 0.34)',
-    shadow: bottomHardware ? 'rgba(4, 16, 15, 0.40)' : 'rgba(4, 16, 15, 0.26)',
-    glow: darkHardware ? 'rgba(130, 214, 208, 0.38)' : 'rgba(245, 212, 132, 0.34)'
+    parchment,
+    wood,
+    outerA: parchment ? 'rgba(245, 224, 169, 0.98)' : darkHardware ? 'rgba(6, 26, 25, 0.98)' : 'rgba(66, 36, 16, 0.96)',
+    outerB: parchment ? 'rgba(219, 183, 118, 0.94)' : darkHardware ? 'rgba(14, 68, 64, 0.96)' : 'rgba(114, 66, 28, 0.94)',
+    outerC: parchment ? 'rgba(100, 61, 28, 0.78)' : darkHardware ? 'rgba(29, 17, 10, 0.96)' : 'rgba(26, 12, 6, 0.98)',
+    insetA: parchment ? 'rgba(255, 243, 202, 0.96)' : darkHardware ? 'rgba(11, 51, 48, 0.84)' : 'rgba(94, 50, 20, 0.80)',
+    insetB: parchment ? 'rgba(224, 190, 126, 0.88)' : darkHardware ? 'rgba(18, 36, 32, 0.78)' : 'rgba(32, 16, 8, 0.74)',
+    strokeA: 'rgba(246, 209, 124, 0.90)',
+    strokeB: parchment ? 'rgba(78, 44, 20, 0.54)' : darkHardware ? 'rgba(130, 214, 208, 0.46)' : 'rgba(245, 212, 132, 0.38)',
+    shadow: bottomHardware ? 'rgba(0, 0, 0, 0.62)' : 'rgba(4, 16, 15, 0.42)',
+    glow: darkHardware ? 'rgba(130, 214, 208, 0.52)' : 'rgba(245, 212, 132, 0.42)'
   };
 }
 
@@ -3657,6 +3740,80 @@ function makeExpeditionGeneratedHudTextTexture(item = {}) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const light = tone !== 'dark';
   const centered = slot === 'command-puck';
+  if (['crest-status', 'objective-loop', 'unit-dock', 'command-puck', 'selected-context'].includes(slot)) {
+    if (['crest-status', 'objective-loop', 'command-puck'].includes(slot)) {
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      textureCache.set(key, texture);
+      return texture;
+    }
+    const textLight = !['selected-context'].includes(slot);
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = textLight ? 'rgba(0, 0, 0, 0.66)' : 'rgba(255, 248, 232, 0.38)';
+    ctx.shadowBlur = textLight ? 8 : 3;
+    ctx.lineWidth = textLight ? 7 : 4;
+    if (slot === 'crest-status') {
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(255, 248, 232, 0.96)';
+      ctx.strokeStyle = 'rgba(25, 13, 7, 0.70)';
+      ctx.font = '900 46px Georgia, serif';
+      ctx.strokeText(title || 'EXPEDITION', 410, 82, 440);
+      ctx.fillText(title || 'EXPEDITION', 410, 82, 440);
+      ctx.font = '800 24px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      ctx.globalAlpha = 0.84;
+      ctx.strokeText(meta, 410, 132, 420);
+      ctx.fillText(meta, 410, 132, 420);
+    } else if (slot === 'objective-loop') {
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(255, 248, 232, 0.98)';
+      ctx.strokeStyle = 'rgba(4, 16, 15, 0.82)';
+      ctx.font = '900 58px Georgia, serif';
+      ctx.strokeText(title || 'SCOUT', 384, 96, 560);
+      ctx.fillText(title || 'SCOUT', 384, 96, 560);
+    } else if (slot === 'unit-dock') {
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(255, 248, 232, 0.96)';
+      ctx.strokeStyle = 'rgba(20, 9, 3, 0.78)';
+      ctx.font = '900 40px Georgia, serif';
+      ctx.strokeText(title || 'UNITS', 132, 88, 210);
+      ctx.fillText(title || 'UNITS', 132, 88, 210);
+      ctx.font = '800 22px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      ctx.strokeText(meta, 132, 128, 200);
+      ctx.fillText(meta, 132, 128, 200);
+    } else if (slot === 'command-puck') {
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(255, 248, 232, 0.96)';
+      ctx.strokeStyle = 'rgba(4, 16, 15, 0.82)';
+      ctx.font = '900 42px Georgia, serif';
+      ctx.strokeText(title || 'NEXT', 384, 76, 440);
+      ctx.fillText(title || 'NEXT', 384, 76, 440);
+      ctx.font = '850 25px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      ctx.globalAlpha = 0.82;
+      ctx.strokeText(meta, 384, 126, 420);
+      ctx.fillText(meta, 384, 126, 420);
+    } else if (slot === 'selected-context') {
+      ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(46, 27, 14, 0.96)';
+      ctx.strokeStyle = 'rgba(255, 248, 232, 0.56)';
+      ctx.font = '900 46px Georgia, serif';
+      ctx.strokeText(title || 'PARCEL', 384, 68, 470);
+      ctx.fillText(title || 'PARCEL', 384, 68, 470);
+      ctx.fillStyle = 'rgba(10, 84, 78, 0.92)';
+      ctx.font = '900 30px Georgia, serif';
+      ctx.strokeText(meta || 'SCOUTED', 384, 134, 420);
+      ctx.fillText(meta || 'SCOUTED', 384, 134, 420);
+    }
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    textureCache.set(key, texture);
+    return texture;
+  }
   const titleX = centered ? 384 : 36;
   const metaX = centered ? 384 : 40;
   const plateX = centered ? 70 : 12;
@@ -3728,6 +3885,313 @@ function makeExpeditionCleanHudChromeTexture(asset = {}) {
   const radius = square ? 148 : vertical ? 56 : 64;
   const material = expeditionHudSlotMaterial(slot);
   ctx.clearRect(0, 0, width, height);
+
+  const finishTexture = () => {
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    textureCache.set(key, texture);
+    return texture;
+  };
+
+  if (slot === 'unit-dock') {
+    const shadow = ctx.createLinearGradient(0, 0, 0, height);
+    shadow.addColorStop(0, 'rgba(0, 0, 0, 0.00)');
+    shadow.addColorStop(0.26, 'rgba(12, 6, 2, 0.56)');
+    shadow.addColorStop(1, 'rgba(4, 2, 1, 0.96)');
+    ctx.fillStyle = shadow;
+    ctx.beginPath();
+    ctx.moveTo(0, height * 0.28);
+    ctx.bezierCurveTo(width * 0.12, height * 0.12, width * 0.35, height * 0.20, width * 0.50, height * 0.30);
+    ctx.bezierCurveTo(width * 0.70, height * 0.43, width * 0.86, height * 0.22, width, height * 0.32);
+    ctx.lineTo(width, height);
+    ctx.lineTo(0, height);
+    ctx.closePath();
+    ctx.fill();
+
+    const rail = ctx.createLinearGradient(0, height * 0.38, width, height * 0.90);
+    rail.addColorStop(0, 'rgba(29, 12, 5, 0.96)');
+    rail.addColorStop(0.28, 'rgba(89, 48, 19, 0.98)');
+    rail.addColorStop(0.58, 'rgba(42, 20, 8, 0.98)');
+    rail.addColorStop(1, 'rgba(13, 6, 3, 0.96)');
+    ctx.fillStyle = rail;
+    ctx.beginPath();
+    ctx.roundRect(0, height * 0.44, width * 0.98, height * 0.38, 40);
+    ctx.fill();
+    drawExpeditionFrontierWoodgrain(ctx, width, height, 0.24);
+
+    ctx.strokeStyle = 'rgba(246, 209, 124, 0.58)';
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(28, height * 0.46);
+    ctx.bezierCurveTo(width * 0.20, height * 0.34, width * 0.38, height * 0.48, width * 0.56, height * 0.53);
+    ctx.bezierCurveTo(width * 0.72, height * 0.58, width * 0.86, height * 0.45, width - 26, height * 0.50);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(9, 38, 35, 0.74)';
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(32, height * 0.78);
+    ctx.lineTo(width * 0.90, height * 0.78);
+    ctx.stroke();
+
+    const socketY = height * 0.49;
+    for (let index = 0; index < 5; index += 1) {
+      const x = width * (0.24 + index * 0.105);
+      const socket = ctx.createRadialGradient(x - 22, socketY - 28, 10, x, socketY, 76);
+      socket.addColorStop(0, 'rgba(255, 248, 232, 0.92)');
+      socket.addColorStop(0.28, 'rgba(191, 149, 75, 0.96)');
+      socket.addColorStop(0.62, 'rgba(38, 19, 8, 0.98)');
+      socket.addColorStop(1, 'rgba(5, 3, 2, 0.78)');
+      ctx.fillStyle = socket;
+      ctx.beginPath();
+      ctx.arc(x, socketY, index === 0 ? 72 : 61, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = index === 0 ? 'rgba(130, 214, 208, 0.90)' : 'rgba(246, 209, 124, 0.56)';
+      ctx.lineWidth = index === 0 ? 8 : 5;
+      ctx.stroke();
+      drawExpeditionHudRivet(ctx, x, socketY + (index === 0 ? 78 : 68), 7, index === 0);
+    }
+
+    ctx.fillStyle = 'rgba(12, 33, 30, 0.86)';
+    ctx.strokeStyle = 'rgba(246, 209, 124, 0.58)';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.roundRect(34, height * 0.49, 118, 62, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255, 248, 232, 0.92)';
+    ctx.font = '900 28px Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('UNIT', 93, height * 0.49 + 32, 92);
+    [34, width * 0.88, width * 0.96].forEach((x, index) => drawExpeditionHudRivet(ctx, x, height * 0.62, index === 0 ? 10 : 8, index < 2));
+    return finishTexture();
+  }
+
+  if (slot === 'command-tray') {
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.62)';
+    ctx.shadowBlur = 28;
+    ctx.shadowOffsetY = 12;
+    const chassis = ctx.createLinearGradient(0, 0, width, height);
+    chassis.addColorStop(0, 'rgba(7, 16, 14, 0.98)');
+    chassis.addColorStop(0.26, 'rgba(77, 49, 24, 0.98)');
+    chassis.addColorStop(0.52, 'rgba(15, 58, 54, 0.98)');
+    chassis.addColorStop(1, 'rgba(21, 10, 5, 0.98)');
+    ctx.fillStyle = chassis;
+    ctx.beginPath();
+    ctx.roundRect(26, 26, width - 52, height - 52, 48);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    drawExpeditionHudPatina(ctx, width, height, 0.22);
+
+    const glassX = width * 0.30;
+    const glassY = height * 0.48;
+    const glass = ctx.createRadialGradient(glassX - 44, glassY - 46, 12, glassX, glassY, 134);
+    glass.addColorStop(0, 'rgba(255, 248, 232, 0.95)');
+    glass.addColorStop(0.25, 'rgba(75, 135, 122, 0.80)');
+    glass.addColorStop(0.58, 'rgba(14, 38, 34, 0.92)');
+    glass.addColorStop(1, 'rgba(3, 8, 7, 0.98)');
+    ctx.fillStyle = glass;
+    ctx.beginPath();
+    ctx.arc(glassX, glassY, 112, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(246, 209, 124, 0.84)';
+    ctx.lineWidth = 15;
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(130, 214, 208, 0.48)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(glassX, glassY, 74, 0, Math.PI * 2);
+    ctx.moveTo(glassX - 88, glassY);
+    ctx.lineTo(glassX + 88, glassY);
+    ctx.moveTo(glassX, glassY - 88);
+    ctx.lineTo(glassX, glassY + 88);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255, 248, 232, 0.50)';
+    ctx.lineWidth = 3;
+    for (let index = 0; index < 6; index += 1) {
+      const angle = (Math.PI * 2 * index) / 6;
+      ctx.beginPath();
+      ctx.arc(glassX + Math.cos(angle) * 44, glassY + Math.sin(angle) * 44, 7, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    const paperX = width * 0.55;
+    const paperY = height * 0.17;
+    const paperW = width * 0.34;
+    const paperH = height * 0.54;
+    const paper = ctx.createLinearGradient(paperX, paperY, paperX + paperW, paperY + paperH);
+    paper.addColorStop(0, 'rgba(255, 243, 202, 0.98)');
+    paper.addColorStop(0.56, 'rgba(229, 197, 131, 0.96)');
+    paper.addColorStop(1, 'rgba(175, 126, 70, 0.92)');
+    drawExpeditionFrontierTornPaper(ctx, paperX, paperY, paperW, paperH, 18);
+    ctx.fillStyle = paper;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(55, 29, 13, 0.64)';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(46, 27, 14, 0.92)';
+    ctx.font = '900 42px Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('PARCEL', paperX + paperW / 2, paperY + 45, paperW - 28);
+    ctx.strokeStyle = 'rgba(27, 106, 100, 0.74)';
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    for (let index = 0; index < 6; index += 1) {
+      const angle = -Math.PI / 2 + index * Math.PI / 3;
+      const x = paperX + paperW / 2 + Math.cos(angle) * 47;
+      const y = paperY + paperH * 0.53 + Math.sin(angle) * 47;
+      if (index === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(27, 106, 100, 0.88)';
+    ctx.font = '900 28px Georgia, serif';
+    ctx.fillText('SCOUTED', paperX + paperW / 2, paperY + paperH - 38, paperW - 32);
+
+    ctx.fillStyle = 'rgba(10, 44, 41, 0.94)';
+    ctx.strokeStyle = 'rgba(246, 209, 124, 0.72)';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.roundRect(width * 0.55, height * 0.74, width * 0.34, 54, 9);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255, 248, 232, 0.96)';
+    ctx.font = '900 28px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    ctx.fillText('DOUBLE-CLICK MOVE', width * 0.72, height * 0.74 + 29, width * 0.30);
+    [58, width - 58, width * 0.50].forEach((x, index) => drawExpeditionHudRivet(ctx, x, height - 48, index === 2 ? 7 : 9, index < 2));
+    return finishTexture();
+  }
+
+  if (slot === 'selected-context') {
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.48)';
+    ctx.shadowBlur = 22;
+    ctx.shadowOffsetY = 8;
+    drawExpeditionFrontierTornPaper(ctx, 42, 26, width - 84, height - 52, 22);
+    const paper = ctx.createLinearGradient(42, 26, width - 42, height - 26);
+    paper.addColorStop(0, 'rgba(255, 244, 205, 0.99)');
+    paper.addColorStop(0.52, 'rgba(228, 195, 128, 0.96)');
+    paper.addColorStop(1, 'rgba(156, 99, 49, 0.86)');
+    ctx.fillStyle = paper;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(55, 29, 13, 0.60)';
+    ctx.lineWidth = 6;
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(46, 27, 14, 0.48)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(width * 0.18, height * 0.26);
+    ctx.lineTo(width * 0.82, height * 0.26);
+    ctx.moveTo(width * 0.16, height * 0.72);
+    ctx.lineTo(width * 0.84, height * 0.72);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(27, 106, 100, 0.78)';
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    const cx = width * 0.38;
+    const cy = height * 0.50;
+    for (let index = 0; index < 6; index += 1) {
+      const angle = -Math.PI / 2 + index * Math.PI / 3;
+      const x = cx + Math.cos(angle) * 54;
+      const y = cy + Math.sin(angle) * 54;
+      if (index === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+    drawExpeditionFrontierCompassRose(ctx, width * 0.78, height * 0.76, 36, 'rgba(55, 29, 13, 0.58)');
+    return finishTexture();
+  }
+
+  if (slot === 'crest-status' || slot === 'objective-loop') {
+    const tealTab = slot === 'objective-loop';
+    const body = ctx.createLinearGradient(0, 0, width, height);
+    body.addColorStop(0, tealTab ? 'rgba(8, 50, 48, 0.98)' : 'rgba(64, 31, 12, 0.98)');
+    body.addColorStop(0.48, tealTab ? 'rgba(17, 92, 86, 0.98)' : 'rgba(109, 65, 26, 0.98)');
+    body.addColorStop(1, 'rgba(9, 6, 4, 0.98)');
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.52)';
+    ctx.shadowBlur = 16;
+    ctx.shadowOffsetY = 5;
+    ctx.fillStyle = body;
+    ctx.beginPath();
+    if (tealTab) {
+      ctx.moveTo(38, 48);
+      ctx.lineTo(width - 72, 48);
+      ctx.lineTo(width - 36, height / 2);
+      ctx.lineTo(width - 72, height - 48);
+      ctx.lineTo(38, height - 48);
+      ctx.closePath();
+    } else {
+      ctx.roundRect(34, 34, width - 68, height - 68, 26);
+    }
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(246, 209, 124, 0.82)';
+    ctx.lineWidth = 7;
+    ctx.stroke();
+    drawExpeditionHudPatina(ctx, width, height, 0.20);
+    if (tealTab) {
+      ctx.fillStyle = 'rgba(255, 248, 232, 0.96)';
+      ctx.font = '900 54px Georgia, serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('SCOUT', width * 0.46, height * 0.52, width * 0.70);
+      drawExpeditionHudRivet(ctx, 52, height / 2, 9, true);
+    } else {
+      drawExpeditionFrontierCompassRose(ctx, 108, height / 2, 42, 'rgba(246, 209, 124, 0.86)');
+      ctx.fillStyle = 'rgba(255, 248, 232, 0.96)';
+      ctx.font = '900 48px Georgia, serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('EXPEDITION', width * 0.58, height * 0.51, width * 0.58);
+      [38, width - 38].forEach((x) => drawExpeditionHudRivet(ctx, x, height / 2, 8, true));
+    }
+    return finishTexture();
+  }
+
+  if (slot === 'collapsed-ledger') {
+    const tab = ctx.createLinearGradient(0, 0, width, height);
+    tab.addColorStop(0, 'rgba(46, 27, 14, 0.98)');
+    tab.addColorStop(0.40, 'rgba(13, 65, 61, 0.98)');
+    tab.addColorStop(1, 'rgba(8, 6, 4, 0.98)');
+    ctx.fillStyle = tab;
+    ctx.beginPath();
+    ctx.roundRect(26, 44, width - 52, height - 88, 44);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(246, 209, 124, 0.82)';
+    ctx.lineWidth = 10;
+    ctx.stroke();
+    drawExpeditionHudPatina(ctx, width, height, 0.26);
+    ctx.save();
+    ctx.translate(width / 2, height / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillStyle = 'rgba(255, 248, 232, 0.96)';
+    ctx.font = '900 78px Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('LEDGER', 0, 0, height * 0.72);
+    ctx.restore();
+    [84, height - 84, height / 2].forEach((y, index) => drawExpeditionHudRivet(ctx, width / 2, y, index === 2 ? 10 : 12, index < 2));
+    return finishTexture();
+  }
+
+  if (slot === 'command-puck') {
+    const glow = ctx.createRadialGradient(width / 2, height / 2, 10, width / 2, height / 2, width * 0.46);
+    glow.addColorStop(0, 'rgba(130, 214, 208, 0.46)');
+    glow.addColorStop(0.45, 'rgba(246, 209, 124, 0.30)');
+    glow.addColorStop(1, 'rgba(9, 6, 4, 0.00)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, width, height);
+    drawExpeditionFrontierCompassRose(ctx, width / 2, height / 2, width * 0.31, 'rgba(246, 209, 124, 0.76)');
+    ctx.strokeStyle = 'rgba(130, 214, 208, 0.72)';
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.arc(width / 2, height / 2, width * 0.20, 0, Math.PI * 2);
+    ctx.stroke();
+    return finishTexture();
+  }
 
   ctx.save();
   ctx.shadowColor = material.shadow;
@@ -4059,6 +4523,202 @@ function makeExpeditionHudWorldCohesionTexture(kind = 'depth-veil') {
   return texture;
 }
 
+function makeExpeditionFrontierLedgerScratchTexture(kind = 'board-frame') {
+  const layer = String(kind || 'board-frame');
+  const key = `expedition-frontier-ledger-scratch:${EXPEDITION_FRONTIER_LEDGER_SCRATCH_VERSION}:${layer}`;
+  if (textureCache.has(key)) return textureCache.get(key);
+  const canvas = document.createElement('canvas');
+  if (layer === 'bottom-medallion-rail') {
+    canvas.width = 1536;
+    canvas.height = 360;
+  } else if (layer === 'top-ledger-tabs') {
+    canvas.width = 960;
+    canvas.height = 240;
+  } else if (layer === 'right-ledger-tab') {
+    canvas.width = 256;
+    canvas.height = 768;
+  } else if (layer === 'parcel-rangefinder-backplate') {
+    canvas.width = 720;
+    canvas.height = 420;
+  } else if (layer === 'trail-pip') {
+    canvas.width = 96;
+    canvas.height = 96;
+  } else {
+    canvas.width = 1536;
+    canvas.height = 864;
+  }
+  const ctx = canvas.getContext('2d');
+  const width = canvas.width;
+  const height = canvas.height;
+  ctx.clearRect(0, 0, width, height);
+
+  if (layer === 'board-frame') {
+    const wash = ctx.createRadialGradient(width * 0.50, height * 0.45, width * 0.16, width * 0.50, height * 0.50, width * 0.74);
+    wash.addColorStop(0, 'rgba(255, 232, 172, 0.06)');
+    wash.addColorStop(0.56, 'rgba(129, 79, 34, 0.08)');
+    wash.addColorStop(0.82, 'rgba(25, 13, 7, 0.30)');
+    wash.addColorStop(1, 'rgba(5, 3, 2, 0.66)');
+    ctx.fillStyle = wash;
+    ctx.fillRect(0, 0, width, height);
+
+    const parchment = ctx.createLinearGradient(0, 0, width, height);
+    parchment.addColorStop(0, 'rgba(238, 206, 139, 0.15)');
+    parchment.addColorStop(0.46, 'rgba(255, 239, 190, 0.06)');
+    parchment.addColorStop(1, 'rgba(101, 58, 28, 0.18)');
+    ctx.fillStyle = parchment;
+    drawExpeditionFrontierTornPaper(ctx, 54, 46, width - 108, height - 106, 34);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(76, 43, 20, 0.30)';
+    ctx.lineWidth = 10;
+    ctx.stroke();
+
+    const topLeather = ctx.createLinearGradient(0, 0, 0, 110);
+    topLeather.addColorStop(0, 'rgba(15, 7, 3, 0.86)');
+    topLeather.addColorStop(0.55, 'rgba(67, 35, 14, 0.62)');
+    topLeather.addColorStop(1, 'rgba(15, 7, 3, 0.02)');
+    ctx.fillStyle = topLeather;
+    ctx.fillRect(0, 0, width, 116);
+    const sideLeather = ctx.createLinearGradient(0, 0, 72, 0);
+    sideLeather.addColorStop(0, 'rgba(7, 3, 1, 0.82)');
+    sideLeather.addColorStop(0.70, 'rgba(64, 34, 14, 0.34)');
+    sideLeather.addColorStop(1, 'rgba(7, 3, 1, 0.00)');
+    ctx.fillStyle = sideLeather;
+    ctx.fillRect(0, 0, 92, height);
+    ctx.save();
+    ctx.translate(width, 0);
+    ctx.scale(-1, 1);
+    ctx.fillStyle = sideLeather;
+    ctx.fillRect(0, 0, 92, height);
+    ctx.restore();
+
+    const bottomLeather = ctx.createLinearGradient(0, height - 190, 0, height);
+    bottomLeather.addColorStop(0, 'rgba(5, 3, 2, 0.00)');
+    bottomLeather.addColorStop(0.36, 'rgba(23, 12, 5, 0.68)');
+    bottomLeather.addColorStop(1, 'rgba(3, 1, 0, 0.94)');
+    ctx.fillStyle = bottomLeather;
+    ctx.fillRect(0, height - 190, width, 190);
+
+    ctx.strokeStyle = 'rgba(246, 209, 124, 0.35)';
+    ctx.lineWidth = 6;
+    ctx.setLineDash([32, 18]);
+    ctx.strokeRect(72, 58, width - 144, height - 128);
+    ctx.setLineDash([]);
+    [[38, 44], [width - 38, 44], [38, height - 38], [width - 38, height - 38]].forEach(([x, y], index) => {
+      drawExpeditionHudRivet(ctx, x, y, index < 2 ? 12 : 14, index % 2 === 0);
+    });
+  } else if (layer === 'bottom-medallion-rail') {
+    const fade = ctx.createLinearGradient(0, 0, 0, height);
+    fade.addColorStop(0, 'rgba(0, 0, 0, 0.00)');
+    fade.addColorStop(0.34, 'rgba(15, 8, 3, 0.68)');
+    fade.addColorStop(1, 'rgba(3, 1, 0, 0.98)');
+    ctx.fillStyle = fade;
+    ctx.fillRect(0, 0, width, height);
+    const rail = ctx.createLinearGradient(0, height * 0.36, width, height * 0.92);
+    rail.addColorStop(0, 'rgba(23, 10, 4, 0.98)');
+    rail.addColorStop(0.25, 'rgba(91, 48, 18, 0.98)');
+    rail.addColorStop(0.50, 'rgba(44, 20, 8, 0.98)');
+    rail.addColorStop(0.80, 'rgba(98, 52, 20, 0.96)');
+    rail.addColorStop(1, 'rgba(15, 7, 3, 0.98)');
+    ctx.fillStyle = rail;
+    ctx.beginPath();
+    ctx.roundRect(0, height * 0.45, width, height * 0.36, 48);
+    ctx.fill();
+    drawExpeditionFrontierWoodgrain(ctx, width, height, 0.26);
+    ctx.strokeStyle = 'rgba(246, 209, 124, 0.44)';
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(width * 0.02, height * 0.49);
+    ctx.bezierCurveTo(width * 0.18, height * 0.32, width * 0.34, height * 0.50, width * 0.50, height * 0.54);
+    ctx.bezierCurveTo(width * 0.68, height * 0.59, width * 0.82, height * 0.39, width * 0.98, height * 0.50);
+    ctx.stroke();
+    for (let index = 0; index < 6; index += 1) {
+      const x = width * (0.28 + index * 0.095);
+      const y = height * 0.47;
+      ctx.strokeStyle = index === 0 ? 'rgba(130, 214, 208, 0.76)' : 'rgba(246, 209, 124, 0.44)';
+      ctx.lineWidth = index === 0 ? 8 : 5;
+      ctx.beginPath();
+      ctx.arc(x, y, index === 0 ? 78 : 60, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  } else if (layer === 'parcel-rangefinder-backplate') {
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.58)';
+    ctx.shadowBlur = 24;
+    ctx.shadowOffsetY = 10;
+    const body = ctx.createLinearGradient(0, 0, width, height);
+    body.addColorStop(0, 'rgba(9, 15, 13, 0.86)');
+    body.addColorStop(0.42, 'rgba(80, 49, 23, 0.74)');
+    body.addColorStop(1, 'rgba(10, 5, 2, 0.82)');
+    ctx.fillStyle = body;
+    ctx.beginPath();
+    ctx.roundRect(24, 34, width - 48, height - 68, 42);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(246, 209, 124, 0.46)';
+    ctx.lineWidth = 8;
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(130, 214, 208, 0.32)';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(width * 0.29, height * 0.50, 118, 0, Math.PI * 2);
+    ctx.stroke();
+    drawExpeditionFrontierCompassRose(ctx, width * 0.29, height * 0.50, 86, 'rgba(246, 209, 124, 0.38)');
+    [54, width - 54, width * 0.52].forEach((x, index) => drawExpeditionHudRivet(ctx, x, height - 54, index === 2 ? 7 : 9, true));
+  } else if (layer === 'right-ledger-tab') {
+    const tab = ctx.createLinearGradient(0, 0, width, height);
+    tab.addColorStop(0, 'rgba(16, 8, 3, 0.82)');
+    tab.addColorStop(0.42, 'rgba(10, 56, 53, 0.80)');
+    tab.addColorStop(1, 'rgba(5, 3, 1, 0.88)');
+    ctx.fillStyle = tab;
+    ctx.beginPath();
+    ctx.roundRect(72, 38, 150, height - 76, 46);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(246, 209, 124, 0.52)';
+    ctx.lineWidth = 8;
+    ctx.stroke();
+    ctx.save();
+    ctx.translate(148, height / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillStyle = 'rgba(255, 248, 232, 0.82)';
+    ctx.font = '900 64px Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('LEDGER', 0, 0, height * 0.62);
+    ctx.restore();
+  } else if (layer === 'top-ledger-tabs') {
+    const strap = ctx.createLinearGradient(0, 0, width, height);
+    strap.addColorStop(0, 'rgba(50, 24, 10, 0.90)');
+    strap.addColorStop(0.54, 'rgba(11, 46, 43, 0.88)');
+    strap.addColorStop(1, 'rgba(10, 5, 2, 0.72)');
+    ctx.fillStyle = strap;
+    ctx.beginPath();
+    ctx.roundRect(12, 38, width * 0.58, height * 0.44, 28);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(246, 209, 124, 0.48)';
+    ctx.lineWidth = 6;
+    ctx.stroke();
+    drawExpeditionFrontierCompassRose(ctx, 74, height * 0.60, 38, 'rgba(246, 209, 124, 0.58)');
+  } else if (layer === 'trail-pip') {
+    const glow = ctx.createRadialGradient(width / 2, height / 2, 2, width / 2, height / 2, width * 0.42);
+    glow.addColorStop(0, 'rgba(255, 248, 232, 0.98)');
+    glow.addColorStop(0.40, 'rgba(246, 209, 124, 0.88)');
+    glow.addColorStop(0.72, 'rgba(130, 214, 208, 0.40)');
+    glow.addColorStop(1, 'rgba(130, 214, 208, 0.00)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = 'rgba(255, 248, 232, 0.96)';
+    ctx.beginPath();
+    ctx.arc(width / 2, height / 2, width * 0.16, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  textureCache.set(key, texture);
+  return texture;
+}
+
 function detailFromExpeditionUnit(object, source = 'expedition-three-raycast') {
   const data = object?.userData || {};
   return {
@@ -4204,6 +4864,44 @@ function makeExpeditionCommandTargetTexture(target = {}) {
     ctx.roundRect(96, 88, 64, 78, 10);
     ctx.stroke();
   }
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(130, 214, 208, 0.82)';
+  ctx.lineWidth = 5;
+  ctx.setLineDash([10, 10]);
+  ctx.beginPath();
+  ctx.arc(128, 128, 116, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.strokeStyle = 'rgba(246, 209, 124, 0.74)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(128, 28);
+  ctx.lineTo(128, 58);
+  ctx.moveTo(128, 198);
+  ctx.lineTo(128, 228);
+  ctx.moveTo(28, 128);
+  ctx.lineTo(58, 128);
+  ctx.moveTo(198, 128);
+  ctx.lineTo(228, 128);
+  ctx.stroke();
+  const label = expeditionHudCommandLabel({ commandId }).replace('MOVE', 'TARGET').slice(0, 8);
+  const plaque = ctx.createLinearGradient(66, 20, 190, 58);
+  plaque.addColorStop(0, 'rgba(255, 243, 202, 0.96)');
+  plaque.addColorStop(1, 'rgba(195, 139, 72, 0.88)');
+  ctx.fillStyle = plaque;
+  ctx.strokeStyle = 'rgba(46, 27, 14, 0.66)';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.roundRect(62, 20, 132, 38, 8);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = 'rgba(46, 27, 14, 0.94)';
+  ctx.font = '900 18px Georgia, serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label || 'TARGET', 128, 40, 110);
+  ctx.restore();
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
@@ -4555,6 +5253,8 @@ class ExpeditionMapThreeStage {
     this.generatedHudProfileSprites = [];
     this.generatedHudTextSprites = [];
     this.generatedHudCommandSprites = [];
+    this.frontierLedgerScratchSprites = [];
+    this.frontierLedgerScratchTrailPips = [];
     this.outcomeFeedback = null;
     this.hoverCellId = '';
     this.terrainUnderlayCount = 0;
@@ -4572,6 +5272,8 @@ class ExpeditionMapThreeStage {
     this.generatedHudProfileCount = 0;
     this.generatedHudTextCount = 0;
     this.generatedHudCommandCount = 0;
+    this.frontierLedgerScratchSpriteCount = 0;
+    this.frontierLedgerScratchTrailPipCount = 0;
     this.scene = new THREE.Scene();
     this.camera = new THREE.OrthographicCamera(-EXPEDITION_WORLD_WIDTH / 2, EXPEDITION_WORLD_WIDTH / 2, EXPEDITION_WORLD_HEIGHT / 2, -EXPEDITION_WORLD_HEIGHT / 2, 0.1, 100);
     this.camera.position.set(0, 0, 10);
@@ -4579,7 +5281,7 @@ class ExpeditionMapThreeStage {
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preserveDrawingBuffer: true });
-    this.renderer.setClearColor(0xd7eddf, 1);
+    this.renderer.setClearColor(0x2d2116, 1);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.domElement.className = 'fp-expedition-three-canvas';
     this.renderer.domElement.dataset.testid = 'fp-expedition-three-canvas';
@@ -4663,6 +5365,8 @@ class ExpeditionMapThreeStage {
     this.generatedHudProfileSprites = [];
     this.generatedHudTextSprites = [];
     this.generatedHudCommandSprites = [];
+    this.frontierLedgerScratchSprites = [];
+    this.frontierLedgerScratchTrailPips = [];
     this.terrainUnderlayCount = 0;
     this.surveyStrokeCount = 0;
     this.markerCount = 0;
@@ -4678,6 +5382,8 @@ class ExpeditionMapThreeStage {
     this.generatedHudProfileCount = 0;
     this.generatedHudTextCount = 0;
     this.generatedHudCommandCount = 0;
+    this.frontierLedgerScratchSpriteCount = 0;
+    this.frontierLedgerScratchTrailPipCount = 0;
     this.edgeFogCount = 0;
     this.civicBeaconCount = 0;
   }
@@ -4975,6 +5681,7 @@ class ExpeditionMapThreeStage {
       }
     }
     this.commandTargetCount = 0;
+    const renderedCommandTargets = [];
     for (const target of expeditionCommandTargetsForUnit(selectedUnit || {}, cellsById)) {
       const position = layout.positions.get(String(target.cellId || ''));
       if (!position) continue;
@@ -5007,6 +5714,7 @@ class ExpeditionMapThreeStage {
       };
       this.pickables.push(sprite);
       this.commandTargetSprites.push(sprite);
+      renderedCommandTargets.push({ target, position });
       this.commandTargetCount += 1;
       this.scene.add(sprite);
     }
@@ -5094,6 +5802,7 @@ class ExpeditionMapThreeStage {
         this.scene.add(sprite);
       });
     }
+    this.addFrontierLedgerScratchCompositionLayer(layout, selectedUnit, renderedCommandTargets);
     this.addGeneratedHudWorldCohesionLayer(layout);
     this.addGeneratedHudChromeLayer();
     this.addGeneratedHudContentLayer();
@@ -5105,6 +5814,117 @@ class ExpeditionMapThreeStage {
       width: Math.max(0.01, (this.camera.right - this.camera.left) / this.camera.zoom),
       height: Math.max(0.01, (this.camera.top - this.camera.bottom) / this.camera.zoom)
     };
+  }
+
+  addFrontierLedgerScratchCompositionLayer(layout, selectedUnit = null, renderedCommandTargets = []) {
+    this.frontierLedgerScratchSprites = [];
+    this.frontierLedgerScratchTrailPips = [];
+    const addScratchSprite = (slot, texture, opacity, renderOrder, userData = {}) => {
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        depthWrite: false,
+        depthTest: false,
+        opacity,
+        alphaTest: 0.01
+      }));
+      sprite.renderOrder = renderOrder;
+      sprite.userData = {
+        kind: 'expedition_frontier_ledger_scratch_hud',
+        layerVersion: EXPEDITION_FRONTIER_LEDGER_SCRATCH_VERSION,
+        slot,
+        northStarPath: EXPEDITION_FRONTIER_LEDGER_NORTH_STAR_PATH,
+        visualOnly: true,
+        readOnly: true,
+        selectable: false,
+        routeAuthority: false,
+        actionAuthority: false,
+        executableActions: 0,
+        ...userData
+      };
+      this.frontierLedgerScratchSprites.push(sprite);
+      this.scene.add(sprite);
+      return sprite;
+    };
+
+    addScratchSprite('frontier-ledger-board-frame', makeExpeditionFrontierLedgerScratchTexture('board-frame'), 0.96, 810, { cameraAnchored: true, compositionRole: 'full_screen_parchment_leather_board' });
+    addScratchSprite('frontier-ledger-bottom-medallion-rail', makeExpeditionFrontierLedgerScratchTexture('bottom-medallion-rail'), 0.98, 888, { cameraAnchored: true, compositionRole: 'bottom_unit_medallion_rail' });
+    addScratchSprite('frontier-ledger-parcel-rangefinder-backplate', makeExpeditionFrontierLedgerScratchTexture('parcel-rangefinder-backplate'), 0.86, 894, { cameraAnchored: true, compositionRole: 'bottom_right_parcel_rangefinder' });
+    addScratchSprite('frontier-ledger-right-tab-shadow', makeExpeditionFrontierLedgerScratchTexture('right-ledger-tab'), 0.78, 886, { cameraAnchored: true, compositionRole: 'collapsed_right_edge_ledger' });
+    addScratchSprite('frontier-ledger-top-tabs-shadow', makeExpeditionFrontierLedgerScratchTexture('top-ledger-tabs'), 0.72, 887, { cameraAnchored: true, compositionRole: 'top_left_expedition_scout_crest' });
+
+    const selectedCellId = String(selectedUnit?.location?.cellId || '');
+    const selectedPosition = layout.positions.get(selectedCellId);
+    const preferredTarget = renderedCommandTargets.find((entry) => String(entry.target?.commandId || '') === 'scout_sector')
+      || renderedCommandTargets.find((entry) => String(entry.target?.commandId || '') === 'move_unit')
+      || renderedCommandTargets[0];
+    if (selectedPosition && preferredTarget?.position) {
+      const targetPosition = preferredTarget.position;
+      const dx = targetPosition.x - selectedPosition.x;
+      const dy = targetPosition.y - selectedPosition.y;
+      const length = Math.hypot(dx, dy);
+      const pipCount = clamp(Math.round(length * 2.2), 4, 11);
+      for (let index = 1; index <= pipCount; index += 1) {
+        const t = index / (pipCount + 1);
+        const arc = Math.sin(t * Math.PI) * clamp(length * 0.12, 0.12, 0.38);
+        const x = selectedPosition.x + dx * t - dy * 0.06 * arc;
+        const y = selectedPosition.y + dy * t + Math.abs(dx) * 0.04 * arc + arc;
+        const pip = addScratchSprite('frontier-ledger-dotted-target-trail', makeExpeditionFrontierLedgerScratchTexture('trail-pip'), 0.88, 708 + index, {
+          cameraAnchored: false,
+          compositionRole: 'map_native_dotted_path_preview',
+          unitId: String(selectedUnit?.unitId || ''),
+          sourceCellId: selectedCellId,
+          targetCellId: String(preferredTarget.target?.cellId || ''),
+          commandId: String(preferredTarget.target?.commandId || ''),
+          previewOnly: true,
+          hiddenTruthLeakage: false
+        });
+        const size = clamp(0.070 + (index / pipCount) * 0.035, 0.07, 0.12);
+        pip.position.set(x, y + 0.10, 0.72 + index * 0.001);
+        pip.scale.set(size, size, 1);
+        this.frontierLedgerScratchTrailPips.push(pip);
+      }
+    }
+    this.frontierLedgerScratchSpriteCount = this.frontierLedgerScratchSprites.length;
+    this.frontierLedgerScratchTrailPipCount = this.frontierLedgerScratchTrailPips.length;
+    this.syncFrontierLedgerScratchSprites();
+  }
+
+  syncFrontierLedgerScratchSprites() {
+    if (!this.frontierLedgerScratchSprites.length) return;
+    const visible = this.visibleSize();
+    const left = this.camera.position.x - (visible.width / 2);
+    const right = this.camera.position.x + (visible.width / 2);
+    const top = this.camera.position.y + (visible.height / 2);
+    const bottom = this.camera.position.y - (visible.height / 2);
+    const compactHud = Number(this.renderer.domElement?.clientWidth || 0) <= 520;
+    this.frontierLedgerScratchSprites.forEach((sprite) => {
+      if (sprite.userData?.cameraAnchored === false) return;
+      const slot = String(sprite.userData?.slot || '');
+      if (slot === 'frontier-ledger-board-frame') {
+        sprite.position.set(this.camera.position.x, this.camera.position.y, 3.82);
+        sprite.scale.set(visible.width * 1.04, visible.height * 1.04, 1);
+      } else if (slot === 'frontier-ledger-bottom-medallion-rail') {
+        const railHeight = clamp(visible.height * (compactHud ? 0.19 : 0.235), 1.12, 2.12);
+        sprite.position.set(this.camera.position.x, bottom + railHeight / 2, 4.10);
+        sprite.scale.set(visible.width * 1.05, railHeight, 1);
+      } else if (slot === 'frontier-ledger-parcel-rangefinder-backplate') {
+        const width = clamp(visible.width * (compactHud ? 0.56 : 0.39), 2.35, visible.width * 0.78);
+        const height = clamp(visible.height * (compactHud ? 0.18 : 0.25), 1.00, 2.18);
+        sprite.position.set(right - width * (compactHud ? 0.49 : 0.50) - visible.width * 0.012, bottom + height * 0.53 + visible.height * 0.010, 4.16);
+        sprite.scale.set(width, height, 1);
+      } else if (slot === 'frontier-ledger-right-tab-shadow') {
+        const width = clamp(visible.width * 0.072, 0.42, 0.72);
+        const height = clamp(visible.height * (compactHud ? 0.34 : 0.48), 2.1, 4.6);
+        sprite.position.set(right - width * 0.44, this.camera.position.y + visible.height * 0.02, 4.14);
+        sprite.scale.set(width, height, 1);
+      } else if (slot === 'frontier-ledger-top-tabs-shadow') {
+        const width = clamp(visible.width * (compactHud ? 0.52 : 0.36), 2.15, 5.15);
+        const height = clamp(visible.height * 0.105, 0.48, 0.96);
+        sprite.position.set(left + width * 0.48, top - height * 0.48, 4.12);
+        sprite.scale.set(width, height, 1);
+      }
+    });
   }
 
   addGeneratedHudWorldCohesionLayer(layout) {
@@ -5234,7 +6054,7 @@ class ExpeditionMapThreeStage {
         transparent: true,
         depthWrite: false,
         depthTest: false,
-        opacity: clamp(number(asset.opacity, 0.72) * 1.34, 0.54, 0.86),
+        opacity: clamp(number(asset.opacity, 0.72) * 1.18, 0.54, 0.94),
         alphaTest: 0.02
       }));
       sprite.renderOrder = 900 + index;
@@ -5446,7 +6266,7 @@ class ExpeditionMapThreeStage {
   syncGeneratedHudContentSprites() {
     const unitDock = this.generatedHudBoundsForSlot('unit-dock');
     const profiles = this.generatedHudProfileSprites;
-    const compactHud = Number(this.canvas?.clientWidth || 0) <= 520;
+    const compactHud = Number(this.renderer?.domElement?.clientWidth || this.hostNode?.clientWidth || 0) <= 520;
     if (profiles.length) {
       const profileSize = compactHud
         ? clamp(Math.min(unitDock.height * 0.66, unitDock.width / Math.max(4.2, profiles.length + 1.4)), 0.46, 0.76)
@@ -5454,8 +6274,8 @@ class ExpeditionMapThreeStage {
       const step = compactHud
         ? clamp(unitDock.width * 0.145, profileSize * 1.08, profileSize * 1.48)
         : clamp(unitDock.width * 0.118, profileSize * 1.10, profileSize * 1.58);
-      const startX = unitDock.left + (unitDock.width * (compactHud ? 0.47 : 0.34));
-      const y = unitDock.bottom + (unitDock.height * (compactHud ? 0.55 : 0.53));
+      const startX = unitDock.left + (unitDock.width * (compactHud ? 0.38 : 0.30));
+      const y = unitDock.bottom + (unitDock.height * (compactHud ? 0.58 : 0.56));
       profiles.forEach((sprite, index) => {
         sprite.position.set(startX + (index * step), y, 4.50 + (index * 0.004));
         sprite.scale.set(profileSize, profileSize, 1);
@@ -5508,11 +6328,11 @@ class ExpeditionMapThreeStage {
     const commandSprites = this.generatedHudCommandSprites;
     if (commandSprites.length) {
       const size = compactHud
-        ? clamp(Math.min(commandTray.height * 0.54, commandTray.width / Math.max(4.0, commandSprites.length + 0.9)), 0.38, 0.62)
-        : clamp(Math.min(commandTray.height * 0.56, commandTray.width / Math.max(4.4, commandSprites.length + 1.0)), 0.42, 0.78);
-      const step = clamp(commandTray.width / Math.max(4.5, commandSprites.length + 0.8), size * 1.02, size * 1.42);
-      const startX = commandTray.left + (commandTray.width * (compactHud ? 0.26 : 0.28));
-      const y = commandTray.bottom + (commandTray.height * (compactHud ? 0.52 : 0.51));
+        ? clamp(Math.min(commandTray.height * 0.34, commandTray.width / Math.max(6.4, commandSprites.length + 2.8)), 0.24, 0.40)
+        : clamp(Math.min(commandTray.height * 0.34, commandTray.width / Math.max(6.8, commandSprites.length + 3.0)), 0.26, 0.46);
+      const step = clamp(commandTray.width / Math.max(7.8, commandSprites.length + 3.6), size * 1.04, size * 1.34);
+      const startX = commandTray.left + (commandTray.width * (compactHud ? 0.17 : 0.20));
+      const y = commandTray.bottom + (commandTray.height * (compactHud ? 0.35 : 0.34));
       commandSprites.forEach((sprite, index) => {
         sprite.position.set(startX + (index * step), y, 4.72 + (index * 0.004));
         sprite.scale.set(size, size, 1);
@@ -5705,6 +6525,7 @@ class ExpeditionMapThreeStage {
   }
 
   updateInfo() {
+    this.syncFrontierLedgerScratchSprites();
     this.syncGeneratedHudWorldCohesionSprites();
     this.syncGeneratedHudChromeSprites();
     this.syncGeneratedHudContentSprites();
@@ -5849,6 +6670,26 @@ class ExpeditionMapThreeStage {
       executableActions: Number(sprite.userData?.executableActions || 0),
       canvas: this.canvasPointForObject(sprite)
     }));
+    const frontierLedgerScratchSprites = this.frontierLedgerScratchSprites.map((sprite) => ({
+      slot: String(sprite.userData?.slot || ''),
+      layerVersion: String(sprite.userData?.layerVersion || ''),
+      compositionRole: String(sprite.userData?.compositionRole || ''),
+      northStarPath: String(sprite.userData?.northStarPath || ''),
+      unitId: String(sprite.userData?.unitId || ''),
+      sourceCellId: String(sprite.userData?.sourceCellId || ''),
+      targetCellId: String(sprite.userData?.targetCellId || ''),
+      commandId: String(sprite.userData?.commandId || ''),
+      cameraAnchored: sprite.userData?.cameraAnchored !== false,
+      previewOnly: sprite.userData?.previewOnly === true,
+      visualOnly: sprite.userData?.visualOnly === true,
+      readOnly: sprite.userData?.readOnly === true,
+      selectable: sprite.userData?.selectable === true,
+      routeAuthority: sprite.userData?.routeAuthority === true,
+      actionAuthority: sprite.userData?.actionAuthority === true,
+      executableActions: Number(sprite.userData?.executableActions || 0),
+      hiddenTruthLeakage: sprite.userData?.hiddenTruthLeakage === true,
+      canvas: this.canvasPointForObject(sprite)
+    }));
     const visibleHudSlots = generatedHudChromeSprites.map((sprite) => ({
       slot: sprite.slot,
       owner: 'three_canvas',
@@ -5975,6 +6816,29 @@ class ExpeditionMapThreeStage {
           generatedHudCommandGlyphsReadOnly: generatedHudCommandSprites.every((sprite) => sprite.readOnly),
           generatedHudCommandGlyphsSelectable: generatedHudCommandSprites.some((sprite) => sprite.selectable),
           generatedHudCommandGlyphAuthority: generatedHudCommandSprites.some((sprite) => sprite.routeAuthority || sprite.actionAuthority || sprite.executableActions > 0),
+          frontierLedgerScratchVisualHud: true,
+          frontierLedgerScratchVersion: EXPEDITION_FRONTIER_LEDGER_SCRATCH_VERSION,
+          frontierLedgerScratchNorthStarPath: EXPEDITION_FRONTIER_LEDGER_NORTH_STAR_PATH,
+          frontierLedgerScratchRendererOwned: true,
+          frontierLedgerScratchSource: 'procedural_canvas_textures_and_three_sprites',
+          frontierLedgerScratchComposition: 'map_first_frontier_ledger_board_with_leather_rail_parcel_rangefinder_and_ledger_tab',
+          frontierLedgerScratchSpriteCount: frontierLedgerScratchSprites.length,
+          frontierLedgerScratchTrailPipCount: frontierLedgerScratchSprites.filter((sprite) => sprite.slot === 'frontier-ledger-dotted-target-trail').length,
+          frontierLedgerScratchCameraAnchoredSpriteCount: frontierLedgerScratchSprites.filter((sprite) => sprite.cameraAnchored).length,
+          frontierLedgerScratchSlots: frontierLedgerScratchSprites.map((sprite) => sprite.slot),
+          frontierLedgerScratchBoardFrame: frontierLedgerScratchSprites.some((sprite) => sprite.slot === 'frontier-ledger-board-frame'),
+          frontierLedgerScratchBottomMedallionRail: frontierLedgerScratchSprites.some((sprite) => sprite.slot === 'frontier-ledger-bottom-medallion-rail'),
+          frontierLedgerScratchParcelRangefinder: frontierLedgerScratchSprites.some((sprite) => sprite.slot === 'frontier-ledger-parcel-rangefinder-backplate'),
+          frontierLedgerScratchCollapsedLedgerTab: frontierLedgerScratchSprites.some((sprite) => sprite.slot === 'frontier-ledger-right-tab-shadow'),
+          frontierLedgerScratchTopLedgerTabs: frontierLedgerScratchSprites.some((sprite) => sprite.slot === 'frontier-ledger-top-tabs-shadow'),
+          frontierLedgerScratchDottedPath: frontierLedgerScratchSprites.some((sprite) => sprite.slot === 'frontier-ledger-dotted-target-trail'),
+          frontierLedgerScratchVisualOnly: frontierLedgerScratchSprites.every((sprite) => sprite.visualOnly),
+          frontierLedgerScratchReadOnly: frontierLedgerScratchSprites.every((sprite) => sprite.readOnly),
+          frontierLedgerScratchSelectable: frontierLedgerScratchSprites.some((sprite) => sprite.selectable),
+          frontierLedgerScratchAuthority: frontierLedgerScratchSprites.some((sprite) => sprite.routeAuthority || sprite.actionAuthority || sprite.executableActions > 0),
+          frontierLedgerScratchHiddenTruthLeakage: frontierLedgerScratchSprites.some((sprite) => sprite.hiddenTruthLeakage),
+          frontierLedgerScratchPreservesDomHitLayer: true,
+          frontierLedgerScratchMovementUx: 'direct_double_click_existing_handler_no_confirm_added',
           serverTerrainAssetContractVersion: EXPEDITION_PUBLIC_TERRAIN_CONTRACT_VERSION,
           serverTerrainSlotSource: EXPEDITION_PUBLIC_TERRAIN_SLOT_SOURCE,
           assetBackedRegionTiles: regionVisuals.filter((cell) => cell.assetPath).length,
@@ -6064,6 +6928,7 @@ class ExpeditionMapThreeStage {
       generatedHudProfileSprites,
       generatedHudTextSprites,
       generatedHudCommandSprites,
+      frontierLedgerScratchSprites,
       visibleHudSlots,
       regionConsistency: {
         waterCueCells: regionVisuals.filter((cell) => cell.waterCue).map((cell) => cell.cellId),
