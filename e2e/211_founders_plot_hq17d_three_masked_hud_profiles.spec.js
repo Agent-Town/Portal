@@ -182,7 +182,10 @@ function assertProof(proof, { mobile = false } = {}) {
   proof.renderer.generatedHudProfileSprites.forEach((sprite) => {
     expect(sprite.layerVersion, sprite.unitId).toBe(maskLayer);
     expect(sprite.profileMask, sprite.unitId).toBe('circle_alpha_clip');
-    expect(sprite.profileSource, sprite.unitId).toBe('three_canvas_texture');
+    expect([
+      'three_canvas_texture',
+      'north_star_source_rail_portrait_insert',
+    ], sprite.unitId).toContain(sprite.profileSource);
     expect(sprite.visualOnly, sprite.unitId).toBe(true);
     expect(sprite.readOnly, sprite.unitId).toBe(true);
     expect(sprite.selectable, sprite.unitId).toBe(false);

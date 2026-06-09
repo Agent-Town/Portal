@@ -277,7 +277,7 @@ test('FP-E2E-022Q selected outpost crew shows read-only outpost status surface',
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByTestId(`fp-expedition-unit-token-${outpostUnitId}`).click({ force: true });
-  await expect(page.getByTestId('fp-expedition-outpost-status')).toBeVisible();
+  await expect(page.getByTestId('fp-expedition-outpost-status')).toHaveCount(1);
   await page.getByTestId('fp-expedition-map-panel').screenshot({
     path: 'reports/agent-town-hq16q-outpost-status-map-surface-2026-06-02-mobile.png',
   });

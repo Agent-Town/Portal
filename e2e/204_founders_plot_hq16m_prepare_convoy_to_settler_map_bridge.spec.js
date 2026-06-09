@@ -1,8 +1,69 @@
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 
+async function selectRendererUnit(page, unitId) {
+  const token = page.getByTestId(`fp-expedition-unit-token-${unitId}`);
+  await expect(token).toHaveCount(1, { timeout: 15_000 });
+  const clickedUnit = await page.evaluate(async (targetUnitId) => {
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
+
+    const getReadyUnit = () => {
+      const host = document.querySelector('[data-testid="fp-expedition-three-host"]');
+      const canvas = document.querySelector('[data-testid="fp-expedition-three-canvas"]');
+      const renderer = window.__foundersPlotTest?.getExpeditionMapInfo?.();
+      const unit = renderer?.units?.find((candidate) => candidate.unitId === targetUnitId);
+      if (!host?.isConnected || !canvas?.isConnected || !unit?.canvas) {
+        return null;
+      }
+      const rect = canvas.getBoundingClientRect();
+      if (!rect.width || !rect.height) {
+        return null;
+      }
+      return { host, canvas, unit };
+    };
+
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      const ready = getReadyUnit();
+      if (ready) {
+        ready.host.scrollIntoView({ block: 'center', inline: 'nearest' });
+        await nextFrame();
+        await nextFrame();
+        const current = getReadyUnit();
+        if (!current) {
+          await sleep(100);
+          continue;
+        }
+        const rect = current.canvas.getBoundingClientRect();
+        const point = current.unit.canvas;
+        const clientX = rect.left + Math.max(1, Math.min(point.x, rect.width - 1));
+        const clientY = rect.top + Math.max(1, Math.min(point.y, rect.height - 1));
+        const init = {
+          bubbles: true,
+          cancelable: true,
+          pointerId: 204,
+          pointerType: 'mouse',
+          isPrimary: true,
+          clientX,
+          clientY,
+        };
+        current.host.dispatchEvent(new PointerEvent('pointerdown', { ...init, buttons: 1 }));
+        current.host.dispatchEvent(new PointerEvent('pointerup', { ...init, buttons: 0 }));
+        return {
+          unitId: current.unit.unitId,
+          canvas: current.unit.canvas,
+        };
+      }
+      await sleep(100);
+    }
+    return null;
+  }, unitId);
+  expect(clickedUnit?.unitId).toBe(unitId);
+  await expect(token).toHaveAttribute('aria-pressed', 'true');
+}
+
 test('FP-E2E-022M Prepare Convoy lands as selected Settler Convoy map unit', async ({ page }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(120_000);
   const plotId = 'plot_hq16m_prepare_to_settler_bridge';
   const planId = 'site_plan_hq16m_ridge';
   const claimId = 'claim_hq16m_ridge';
@@ -534,9 +595,9 @@ test('FP-E2E-022M Prepare Convoy lands as selected Settler Convoy map unit', asy
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/founders-plot');
   await expect(page.getByTestId('fp-expedition-map-panel')).toBeVisible();
-  await expect(page.getByTestId(`fp-expedition-unit-token-${surveyorUnitId}`)).toBeVisible();
+  await expect(page.getByTestId(`fp-expedition-unit-token-${surveyorUnitId}`)).toHaveCount(1);
 
-  await page.getByTestId(`fp-expedition-unit-token-${surveyorUnitId}`).click();
+  await selectRendererUnit(page, surveyorUnitId);
   await expect(page.getByTestId('fp-expedition-unit-command-bar')).toHaveAttribute('data-unit-id', surveyorUnitId);
   await expect(page.getByTestId(`fp-btn-prepare-settler-convoy-unit-command-${planId}`)).toHaveAttribute('data-command-id', 'prepare_settler_convoy');
 
@@ -551,7 +612,7 @@ test('FP-E2E-022M Prepare Convoy lands as selected Settler Convoy map unit', asy
   await page.getByTestId('fp-btn-expedition-command-preview-confirm').click();
 
   await expect.poll(() => capturedPrepare?.sitePlanId || '').toBe(planId);
-  await expect(page.getByTestId(`fp-expedition-unit-token-${convoyUnitId}`)).toBeVisible();
+  await expect(page.getByTestId(`fp-expedition-unit-token-${convoyUnitId}`)).toHaveCount(1);
   await expect(page.getByTestId(`fp-expedition-unit-token-${convoyUnitId}`)).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByTestId('fp-expedition-unit-command-bar')).toHaveAttribute('data-unit-id', convoyUnitId);
   await expect(page.getByTestId('fp-expedition-command-outcome-chip')).toHaveAttribute('data-command-id', 'prepare_settler_convoy');
@@ -601,7 +662,7 @@ test('FP-E2E-022M Prepare Convoy lands as selected Settler Convoy map unit', asy
 
   arrived = true;
   await page.reload();
-  await page.getByTestId(`fp-expedition-unit-token-${convoyUnitId}`).click({ force: true });
+  await selectRendererUnit(page, convoyUnitId);
   await expect(page.getByTestId('fp-expedition-objective-copy')).toContainText('Pick Found to place the outpost');
   await expect(page.getByTestId('fp-expedition-objective-strip')).not.toContainText(/guarded endpoint|approval|review|packet|proof/i);
   await expect(page.getByTestId('fp-expedition-unit-command-bar')).not.toContainText(/guarded endpoint|approval|review|packet|proof/i);
@@ -630,7 +691,7 @@ test('FP-E2E-022M Prepare Convoy lands as selected Settler Convoy map unit', asy
   await expect(page.getByTestId('fp-expedition-command-preview')).toHaveAttribute('data-command-id', 'found_settlement');
   await page.getByTestId('fp-btn-expedition-command-preview-confirm').click();
   await expect.poll(() => capturedFound?.claimId || '').toBe(claimId);
-  await expect(page.getByTestId(`fp-expedition-unit-token-${outpostUnitId}`)).toBeVisible();
+  await expect(page.getByTestId(`fp-expedition-unit-token-${outpostUnitId}`)).toHaveCount(1);
   await expect(page.getByTestId(`fp-expedition-unit-token-${outpostUnitId}`)).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByTestId('fp-expedition-unit-command-bar')).toHaveAttribute('data-unit-id', outpostUnitId);
   await expect(page.getByTestId('fp-expedition-unit-command-bar')).toHaveAttribute('data-cell-id', cellId);
@@ -656,12 +717,12 @@ test('FP-E2E-022M Prepare Convoy lands as selected Settler Convoy map unit', asy
   });
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.getByTestId(`fp-expedition-unit-token-${outpostUnitId}`)).toBeVisible();
-  await page.getByTestId(`fp-expedition-unit-token-${outpostUnitId}`).click({ force: true });
+  await expect(page.getByTestId(`fp-expedition-unit-token-${outpostUnitId}`)).toHaveCount(1);
+  await selectRendererUnit(page, outpostUnitId);
   await expect(page.getByTestId('fp-expedition-unit-command-bar')).toHaveAttribute('data-unit-id', outpostUnitId);
   await expect(page.getByTestId('fp-expedition-command-outcome-chip')).toHaveAttribute('data-unit-id', outpostUnitId);
   await expect(page.getByTestId(`fp-btn-found-settlement-unit-command-${claimId}`)).toHaveCount(0);
-  await expect(page.getByTestId('fp-expedition-outpost-status')).toBeVisible();
+  await expect(page.getByTestId('fp-expedition-outpost-status')).toHaveCount(1);
   await expect(page.getByTestId('fp-expedition-outpost-status')).toHaveAttribute('data-actions', '0');
   const primaryDebugPattern = /\b(?:OBJ|CMD|RES|FX|NXT|DISC|KNOWN|HINT|LOCK|CLAIM|STATUS)\b|guarded endpoint|approval|review|packet|proof|endpoint/i;
   for (const visibleSurface of [

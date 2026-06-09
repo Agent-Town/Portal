@@ -77,6 +77,7 @@ async function canvasStats(page) {
 }
 
 test('Three.js Founders Plot renders Clover plus builder, worker, and hauler from server visualActors', async ({ page, request }, testInfo) => {
+  test.setTimeout(90_000);
   await page.goto('/founders-plot');
   await expect(page.getByTestId('fp-root')).toBeVisible();
   await expect(page.getByTestId('founders-three-scene')).toBeVisible();
@@ -159,42 +160,42 @@ test('Three.js Founders Plot renders Clover plus builder, worker, and hauler fro
   await expect(page.getByTestId('fp-tile-0-1')).toContainText('Idle');
   await page.getByTestId('fp-tile-0-1').click();
   await page.getByTestId('fp-btn-queue').click();
-  await waitForRole(page, 'worker');
-  await expect(page.getByTestId('fp-visual-actor-worker')).toHaveAttribute('data-source-domain', 'job');
-  await expect(page.getByTestId('fp-visual-actor-worker')).toHaveAttribute('data-action-kind', 'PRODUCE');
-  await expect(page.getByTestId('fp-visual-actor-worker')).toHaveAttribute('data-action-cue', 'production_work');
-  await expect(page.getByTestId('fp-visual-actor-worker')).toHaveAttribute('data-accessory', 'tools');
+  await waitForRole(page, 'lumber_worker');
+  const lumberJobActorHook = page.locator('[data-testid="fp-visual-actor-lumber_worker"][data-source-domain="job"]').first();
+  await expect(lumberJobActorHook).toHaveAttribute('data-source-domain', 'job');
+  await expect(lumberJobActorHook).toHaveAttribute('data-action-kind', 'PRODUCE');
+  await expect(lumberJobActorHook).toHaveAttribute('data-action-cue', 'lumber_milling');
+  await expect(lumberJobActorHook).toHaveAttribute('data-accessory', 'wood_bundle');
   const workerInfo = await page.evaluate(() => window.__foundersPlotTest.getThreeSceneInfo());
   expect(workerInfo.actors).toEqual(expect.arrayContaining([
     expect.objectContaining({
-      canonicalRoleId: 'worker',
-      assetSrc: '/experiences/founders-plot/assets/characters/inhabitants/worker/kettle-37-worker-v1.png',
+      canonicalRoleId: 'lumber_worker',
+      assetSrc: '/experiences/founders-plot/assets/characters/inhabitants/lumber_worker/lumber-worker-jun-timberline-v1.png',
       assetSprite: expect.objectContaining({
-        id: 'kettle-37-worker-v1',
-        action: 'work',
-        row: 2,
+        id: 'lumber-worker-jun-timberline-v1',
+        action: 'mill',
         columns: 4,
         rows: 4
       }),
-      actionAnimation: expect.objectContaining({ mode: 'busy_work' })
+      actionAnimation: expect.objectContaining({ mode: 'lumber_mill' })
     })
   ]));
   expect(workerInfo.renderedActors).toEqual(expect.arrayContaining([
     expect.objectContaining({
-      canonicalRoleId: 'worker',
+      canonicalRoleId: 'lumber_worker',
       spriteSheet: true,
-      spriteSheetId: 'kettle-37-worker-v1',
-      spriteSheetAction: 'work',
+      spriteSheetId: 'lumber-worker-jun-timberline-v1',
+      spriteSheetAction: 'mill',
       assetFallback: false
     })
   ]));
   expect(workerInfo.actionCues).toEqual(expect.arrayContaining([
-    expect.objectContaining({ canonicalRoleId: 'worker', cueType: 'production_work', accessory: 'tools' })
+    expect.objectContaining({ canonicalRoleId: 'lumber_worker', cueType: 'lumber_milling', accessory: 'wood_bundle' })
   ]));
-  const workerActor = workerInfo.actors.find((actor) => actor.canonicalRoleId === 'worker');
+  const workerActor = workerInfo.actors.find((actor) => actor.canonicalRoleId === 'lumber_worker');
   expect(workerActor.route).toEqual(expect.objectContaining({
     visualOnly: true,
-    mode: 'work',
+    mode: 'mill',
     targetId: workerActor.target.id
   }));
   expect(workerInfo.renderedWays).toEqual(expect.arrayContaining([
@@ -204,11 +205,12 @@ test('Three.js Founders Plot renders Clover plus builder, worker, and hauler fro
   await advancePlot(page, 2 * 60 * 1000);
   await page.reload();
   await expect(page.getByTestId('fp-tile-0-1')).toContainText('Ready to collect');
-  await waitForRole(page, 'hauler');
-  await expect(page.getByTestId('fp-visual-actor-hauler')).toHaveAttribute('data-source-domain', 'building');
-  await expect(page.getByTestId('fp-visual-actor-hauler')).toHaveAttribute('data-action-kind', 'OUTPUT_READY');
-  await expect(page.getByTestId('fp-visual-actor-hauler')).toHaveAttribute('data-action-cue', 'carry_bundle');
-  await expect(page.getByTestId('fp-visual-actor-hauler')).toHaveAttribute('data-accessory', 'bundle');
+  await waitForRole(page, 'lumber_worker');
+  const lumberReadyActorHook = page.locator('[data-testid="fp-visual-actor-lumber_worker"][data-source-domain="building"]').first();
+  await expect(lumberReadyActorHook).toHaveAttribute('data-source-domain', 'building');
+  await expect(lumberReadyActorHook).toHaveAttribute('data-action-kind', 'OUTPUT_READY');
+  await expect(lumberReadyActorHook).toHaveAttribute('data-action-cue', 'lumber_output_ready');
+  await expect(lumberReadyActorHook).toHaveAttribute('data-accessory', 'wood_bundle');
 
   const beforeMessengerPickEvents = await eventCount(request);
   await clickActorOnCanvas(page, 'messenger');
@@ -217,10 +219,10 @@ test('Three.js Founders Plot renders Clover plus builder, worker, and hauler fro
 
   const info = await page.evaluate(() => window.__foundersPlotTest.getThreeSceneInfo());
   expect(info.renderer).toBe('three.js');
-  expect(info.roles).toEqual(expect.arrayContaining(['clover', 'hauler']));
+  expect(info.roles).toEqual(expect.arrayContaining(['clover', 'lumber_worker']));
   expect(info.actors.every((actor) => actor.visualOnly === true)).toBe(true);
   expect(info.actionCues).toEqual(expect.arrayContaining([
-    expect.objectContaining({ canonicalRoleId: 'hauler', cueType: 'carry_bundle', accessory: 'bundle' }),
+    expect.objectContaining({ canonicalRoleId: 'lumber_worker', cueType: 'lumber_output_ready', accessory: 'wood_bundle' }),
     expect.objectContaining({ canonicalRoleId: 'messenger', cueType: 'attention_marker' })
   ]));
   expect(info.ways.length).toBeGreaterThan(0);
@@ -229,16 +231,15 @@ test('Three.js Founders Plot renders Clover plus builder, worker, and hauler fro
   expect(info.encounters.every((encounter) => encounter.visualOnly === true)).toBe(true);
   expect(info.actors).toEqual(expect.arrayContaining([
     expect.objectContaining({
-      canonicalRoleId: 'hauler',
-      assetSrc: '/experiences/founders-plot/assets/characters/inhabitants/hauler/oona-tallpack-hauler-v1.png',
+      canonicalRoleId: 'lumber_worker',
+      assetSrc: '/experiences/founders-plot/assets/characters/inhabitants/lumber_worker/lumber-worker-jun-timberline-v1.png',
       assetSprite: expect.objectContaining({
-        id: 'oona-tallpack-hauler-v1',
+        id: 'lumber-worker-jun-timberline-v1',
         action: 'ready',
-        row: 3,
         columns: 4,
         rows: 4
       }),
-      actionAnimation: expect.objectContaining({ mode: 'carry_wobble', stepStyle: 'waddle' })
+      actionAnimation: expect.objectContaining({ mode: 'lumber_mill', stepStyle: 'walk' })
     }),
     expect.objectContaining({
       canonicalRoleId: 'messenger',
@@ -256,9 +257,9 @@ test('Three.js Founders Plot renders Clover plus builder, worker, and hauler fro
   ]));
   expect(info.renderedActors).toEqual(expect.arrayContaining([
     expect.objectContaining({
-      canonicalRoleId: 'hauler',
+      canonicalRoleId: 'lumber_worker',
       spriteSheet: true,
-      spriteSheetId: 'oona-tallpack-hauler-v1',
+      spriteSheetId: 'lumber-worker-jun-timberline-v1',
       spriteSheetAction: 'ready',
       assetFallback: false
     }),

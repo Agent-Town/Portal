@@ -1,0 +1,49 @@
+{
+  "packId": "frontier-ledger-north-star-hud-v1",
+  "source": "/Users/robin/Downloads/Frontier_Ledger.png",
+  "sourceSize": {
+    "width": 1672,
+    "height": 941
+  },
+  "purpose": "Static viewport chrome cut from the Frontier Ledger North Star image. The center map and gameplay state remain dynamic Three.js layers.",
+  "slots": [
+    {
+      "slot": "frontier-ledger-top-tabs-shadow",
+      "file": "top-tabs.png",
+      "crop": { "x": 0, "y": 0, "width": 430, "height": 132 },
+      "visibleRegions": [
+        { "x": 0, "y": 0, "width": 430, "height": 97 },
+        { "x": 0, "y": 0, "width": 97, "height": 132 }
+      ]
+    },
+    {
+      "slot": "frontier-ledger-right-tab-shadow",
+      "file": "right-ledger-tab.png",
+      "crop": { "x": 1588, "y": 220, "width": 84, "height": 420 }
+    },
+    {
+      "slot": "frontier-ledger-bottom-medallion-rail",
+      "file": "bottom-rail.png",
+      "crop": { "x": 0, "y": 650, "width": 1672, "height": 291 },
+      "visibleRegions": [
+        { "x": 0, "y": 112, "width": 1303, "height": 179 },
+        { "x": 1588, "y": 112, "width": 84, "height": 179 }
+      ],
+      "visibleEllipses": [
+        { "cx": 470, "cy": 135, "rx": 110, "ry": 118 },
+        { "cx": 635, "cy": 135, "rx": 104, "ry": 112 },
+        { "cx": 795, "cy": 135, "rx": 104, "ry": 112 },
+        { "cx": 962, "cy": 135, "rx": 104, "ry": 112 }
+      ],
+      "transparentRegions": [
+        { "x": 0, "y": 0, "width": 1672, "height": 112 },
+        { "x": 1303, "y": 0, "width": 285, "height": 291 }
+      ]
+    },
+    {
+      "slot": "frontier-ledger-parcel-rangefinder-backplate",
+      "file": "parcel-rangefinder.png",
+      "crop": { "x": 1325, "y": 575, "width": 300, "height": 345 }
+    }
+  ]
+}

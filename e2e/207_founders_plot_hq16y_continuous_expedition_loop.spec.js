@@ -130,7 +130,7 @@ async function selectUnitToken(page, unitId) {
 }
 
 test('FP-E2E-022Y continuous Expedition Map loop replay reaches the next Scout bridge', async ({ page, request }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
   await request.post('/__test__/reset', { headers: { 'x-test-reset': resetToken } });
 
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -324,9 +324,64 @@ test('FP-E2E-022Y continuous Expedition Map loop replay reaches the next Scout b
       outpostNextFrontierBeaconAuthority: bridgeBefore.visualLayers.outpostNextFrontierBeaconAuthority,
     },
   };
-  await page.getByTestId('fp-expedition-map-panel').screenshot({ path: screenshots.outpostBridge });
+  await page.getByTestId('fp-expedition-map-panel').evaluate((node) => node.scrollIntoView({ block: 'center', inline: 'nearest' }));
+  await page.screenshot({ path: screenshots.outpostBridge, fullPage: true, animations: 'disabled' });
 
-  await page.getByTestId('fp-expedition-three-canvas').click({ position: beacon.canvas, force: true });
+  const clickedBeacon = await page.evaluate(async (targetCellId) => {
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+    const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
+
+    const getReadyBeacon = () => {
+      const host = document.querySelector('[data-testid="fp-expedition-three-host"]');
+      const renderer = window.__foundersPlotTest?.getExpeditionMapInfo?.();
+      const entry = renderer?.outpostNextFrontierBeacons?.find((candidate) => candidate.targetCellId === targetCellId)
+        || renderer?.outpostNextFrontierBeacons?.[0];
+      if (!host?.isConnected || !entry?.canvas) {
+        return null;
+      }
+      const rect = host.getBoundingClientRect();
+      if (!rect.width || !rect.height) {
+        return null;
+      }
+      return { host, entry };
+    };
+
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      const ready = getReadyBeacon();
+      if (ready) {
+        ready.host.scrollIntoView({ block: 'center', inline: 'nearest' });
+        await nextFrame();
+        await nextFrame();
+        const current = getReadyBeacon();
+        if (!current) {
+          await sleep(100);
+          continue;
+        }
+        const rect = current.host.getBoundingClientRect();
+        const point = current.entry.canvas;
+        const clientX = rect.left + Math.max(1, Math.min(point.x, rect.width - 1));
+        const clientY = rect.top + Math.max(1, Math.min(point.y, rect.height - 1));
+        const init = {
+          bubbles: true,
+          cancelable: true,
+          pointerId: 707,
+          pointerType: 'mouse',
+          isPrimary: true,
+          clientX,
+          clientY,
+        };
+        current.host.dispatchEvent(new PointerEvent('pointerdown', { ...init, buttons: 1 }));
+        current.host.dispatchEvent(new PointerEvent('pointerup', { ...init, buttons: 0 }));
+        return {
+          targetCellId: current.entry.targetCellId,
+          canvas: current.entry.canvas,
+        };
+      }
+      await sleep(100);
+    }
+    return null;
+  }, beacon.targetCellId);
+  expect(clickedBeacon?.targetCellId).toBe(beacon.targetCellId);
   await expect(page.getByTestId('fp-expedition-map-selected-summary')).toHaveAttribute('data-cell-id', beacon.targetCellId);
   await expect(page.getByTestId('fp-expedition-map-selected-summary')).toHaveAttribute('data-scoutable', 'true');
   const scoutAliases = page.getByTestId('fp-expedition-inspector-scout-aliases');

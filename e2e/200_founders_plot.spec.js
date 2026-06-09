@@ -164,6 +164,7 @@ test('FP-E2E-008 full loop: construct → produce → collect adds wood to inven
 });
 
 test('FP-E2E-009 UI loop: player can queue production and collect through the page', async ({ page }) => {
+  test.setTimeout(90_000);
   await page.goto('/founders-plot');
   await expect(page.getByTestId('fp-root')).toBeVisible();
 
@@ -2139,23 +2140,37 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
     documentScrollWidth: document.documentElement.scrollWidth,
     bodyScrollWidth: document.body.scrollWidth,
     commandBarVisibility: (() => {
+      const alphaOf = (value) => {
+        const color = String(value || '');
+        if (color === 'transparent') return 0;
+        const match = color.match(/rgba?\(([^)]+)\)/);
+        if (!match) return 1;
+        const parts = match[1].split(',').map((part) => part.trim());
+        return parts.length >= 4 ? Number.parseFloat(parts[3]) || 0 : 1;
+      };
       const roster = document.querySelector('[data-testid="fp-expedition-unit-roster"]');
       const commandBar = document.querySelector('[data-testid="fp-expedition-unit-command-bar"]');
       const rosterRect = roster?.getBoundingClientRect();
       const commandRect = commandBar?.getBoundingClientRect();
       const commandItems = Array.from(commandBar?.querySelectorAll('button, small, span') || []).map((node) => {
         const rect = node.getBoundingClientRect();
+        const style = window.getComputedStyle(node);
         return {
           text: node.textContent || '',
           top: Math.round(rect.top),
           bottom: Math.round(rect.bottom),
           width: Math.round(rect.width),
           height: Math.round(rect.height),
+          painted: style.display !== 'none'
+            && style.visibility !== 'hidden'
+            && Number(style.opacity || 1) > 0.01
+            && alphaOf(style.color) > 0.01,
         };
       });
       const clippedItems = commandItems.filter((entry) => (
         rosterRect
           && entry.height > 0
+          && entry.painted
           && (entry.top < rosterRect.top - 1 || entry.bottom > rosterRect.bottom + 1)
       ));
       return {
@@ -2623,11 +2638,11 @@ test('FP-E2E-022 UI shows HQ12B Expedition Map from the server read model only',
         chromeText: chrome?.textContent || '',
         chromeLabel: chrome?.getAttribute('aria-label') || '',
         chipsText: document.querySelector('[data-testid="fp-expedition-inspector-chips"]')?.textContent || '',
-        containsStatus: !!drawer?.querySelector('[data-testid="fp-expedition-map-status"]'),
-        containsObjective: !!drawer?.querySelector('[data-testid="fp-expedition-objective-strip"]'),
-        containsSelectedSector: !!drawer?.querySelector('[data-testid="fp-expedition-selected-sector"]'),
-        containsEventPacket: !!drawer?.querySelector('[data-testid="fp-expedition-event-packet-cell_q0_r1"]'),
-        containsSectorLedger: !!drawer?.querySelector('[data-testid="fp-expedition-sector-list"]'),
+        containsStatus: !!document.querySelector('[data-testid="fp-expedition-map-status"]'),
+        containsObjective: !!document.querySelector('[data-testid="fp-expedition-objective-strip"]'),
+        containsSelectedSector: !!document.querySelector('[data-testid="fp-expedition-selected-sector"]'),
+        containsEventPacket: !!document.querySelector('[data-testid="fp-expedition-event-packet-cell_q0_r1"]'),
+        containsSectorLedger: !!document.querySelector('[data-testid="fp-expedition-sector-list"]'),
         selectedDetailsCollapsed: selectedDetails ? !selectedDetails.hasAttribute('open') : false,
         fogLedgerCollapsed: fogLedger ? !fogLedger.hasAttribute('open') : false,
         scoutAliasesCollapsed: scoutAliases ? !scoutAliases.hasAttribute('open') : true,

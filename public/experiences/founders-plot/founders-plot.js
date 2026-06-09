@@ -2080,7 +2080,7 @@
       routeAuthority: false,
       actionAuthority: false,
       createdAt: now,
-      expiresAt: now + 9000,
+      expiresAt: now + 30000,
     };
     feedback.ariaLabel = input.ariaLabel
       || `${feedback.label} ${expeditionUnitRoleCode(feedback)} at ${expeditionCompactCellLabel(feedback.cellId)} from server result.`;
@@ -3733,7 +3733,11 @@
 
     const counts = expeditionFogCounts(model, cells);
     const update = () => {
-      const info = renderer?.getExpeditionMapInfo?.(host) || state.expeditionMapThreeInfo || {};
+      const rendererInfo = renderer?.getExpeditionMapInfo?.(host);
+      if (rendererInfo) {
+        state.expeditionMapThreeInfo = rendererInfo;
+      }
+      const info = rendererInfo || state.expeditionMapThreeInfo || {};
       const tier = expeditionSemanticZoomTier(info.camera?.zoom || info.zoom);
       const currentCellId = String(info.selectedCellId || selectedCellId || '');
       const selected = cells.find((cell) => String(cell.cellId || '') === currentCellId) || selectedExpeditionCell(cells, model);
@@ -3886,6 +3890,7 @@
       'fp-expedition-map-body--hq17c-generated-chrome',
       'fp-expedition-map-body--hq17d-three-masks',
       'fp-expedition-map-body--hq17f-single-owner-canvas-hud',
+      'fp-expedition-map-body--frontier-ledger-source-chrome',
     );
     body.dataset.visibleHudOwner = 'three_canvas';
     body.dataset.domVisibleHudDemoted = 'true';
@@ -3895,6 +3900,7 @@
       'fp-expedition-map-panel--hq17c-generated-chrome',
       'fp-expedition-map-panel--hq17d-three-masks',
       'fp-expedition-map-panel--hq17f-single-owner-canvas-hud',
+      'fp-expedition-map-panel--frontier-ledger-source-chrome',
     );
 
     if (!hasExpeditionMapReadModel(model, bundle)) {
@@ -5439,6 +5445,7 @@
       openPalette(sel.x, sel.y, bundle);
       return;
     }
+    closePalette();
     const b = sel.building;
     const def = (bundle.buildingDefs || {})[b.type] || {};
     els.bldTitle.textContent = `${BUILDING_LABELS[b.type] || b.type} · Lv ${b.level || 1}`;
@@ -6522,7 +6529,7 @@
     const buildings = Array.isArray(bundle.buildings) ? bundle.buildings : [];
     const current = state.selected.kind === 'building'
       ? buildings.find((b) => b.buildingId === state.selected.building?.buildingId)
-      : buildings.find((b) => b.x === state.selected.x && b.y === state.selected.y);
+      : buildings.find((b) => Number(b.x) === Number(state.selected.x) && Number(b.y) === Number(state.selected.y));
     if (current) {
       state.selected = {
         kind: 'building',
@@ -6898,6 +6905,7 @@
       receiptId: data.scoutSector?.scoutId || data.sector?.scoutId || data.eventPacket?.packetId || '',
       receiptKind: data.eventPacket?.packetId ? 'scout_sector_event_packet' : 'scout_sector_receipt',
     });
+    renderExpeditionMap(state.bundle || {});
     await loadState();
     toast(data.alreadyScouted ? 'Sector already known.' : 'Sector scouted.');
   }

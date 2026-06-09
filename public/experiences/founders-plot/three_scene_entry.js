@@ -1130,12 +1130,25 @@ class FoundersPlotThreeStage {
     this.pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     this.raycaster.setFromCamera(this.pointer, this.camera);
     const hits = this.raycaster.intersectObjects(this.pickables, false);
+    hits.sort((a, b) => {
+      const priorityFor = (hit) => {
+        const data = hit?.object?.userData || {};
+        if (data.kind === 'actor') return 100;
+        if (data.kind === 'building') return 70;
+        if (data.kind === 'pad') return 60;
+        if (data.kind === 'grid_cell') return 10;
+        return 30;
+      };
+      const priorityDelta = priorityFor(b) - priorityFor(a);
+      if (priorityDelta) return priorityDelta;
+      return a.distance - b.distance;
+    });
     return hits[0]?.object || null;
   }
 
   onClick(event) {
-    if (event.target instanceof Element && event.target.closest('.fp-tile')) return;
     const hit = this.pickFromEvent(event);
+    if (event.target instanceof Element && event.target.closest('.fp-tile') && hit?.userData?.kind !== 'actor') return;
     if (!hit) return;
     const detail = detailFromObject(hit);
     if (detail.visualOnly) {
@@ -1360,7 +1373,67 @@ const EXPEDITION_GENERATED_HUD_SINGLE_OWNER_VERSION = 'hq17f_single_owner_canvas
 const EXPEDITION_GENERATED_HUD_MATERIALITY_VERSION = 'hq17g_renderer_owned_hud_materiality_v1';
 const EXPEDITION_GENERATED_HUD_WORLD_COHESION_VERSION = 'hq17h_renderer_hud_world_cohesion_v1';
 const EXPEDITION_FRONTIER_LEDGER_SCRATCH_VERSION = 'hq18_frontier_ledger_scratch_visual_hud_v1';
+const EXPEDITION_FRONTIER_LEDGER_SYSTEM_VERSION = 'hq18a_frontier_ledger_map_system_v1';
+const EXPEDITION_FRONTIER_LEDGER_PRESENTATION_VERSION = 'hq18b_frontier_ledger_visual_parity_pass_v1';
+const EXPEDITION_FRONTIER_LEDGER_SOURCE_CHROME_COMPOSITION_VERSION = 'hq18d_frontier_ledger_outer_source_chrome_cutout_v1';
+const EXPEDITION_FRONTIER_LEDGER_OUTER_FRAME_OPACITY = 0.28;
+const EXPEDITION_FRONTIER_LEDGER_BOTTOM_BRIDGE_OPACITY = 0.12;
+const EXPEDITION_FRONTIER_LEDGER_TERRAIN_UNDERLAY_OPACITY = 0.44;
 const EXPEDITION_FRONTIER_LEDGER_NORTH_STAR_PATH = 'frontier-ledger-north-star-upload-2026-06-05';
+const EXPEDITION_FRONTIER_LEDGER_REFERENCE = Object.freeze({
+  path: '/Users/robin/Downloads/Frontier_Ledger.png',
+  width: 1672,
+  height: 941,
+  aspect: 1672 / 941
+});
+const EXPEDITION_FRONTIER_LEDGER_NORTH_STAR_HUD_PACK_ID = 'frontier-ledger-north-star-hud-v1';
+const EXPEDITION_FRONTIER_LEDGER_NORTH_STAR_HUD_BASE = `${EXPEDITION_REGION_ASSET_BASE}/${EXPEDITION_FRONTIER_LEDGER_NORTH_STAR_HUD_PACK_ID}`;
+const EXPEDITION_FRONTIER_LEDGER_NORTH_STAR_HUD_ASSETS = Object.freeze({
+  'frontier-ledger-top-tabs-shadow': {
+    slot: 'frontier-ledger-top-tabs-shadow',
+    path: `${EXPEDITION_FRONTIER_LEDGER_NORTH_STAR_HUD_BASE}/top-tabs.png`,
+    crop: { x: 0, y: 0, width: 430, height: 132 }
+  },
+  'frontier-ledger-right-tab-shadow': {
+    slot: 'frontier-ledger-right-tab-shadow',
+    path: `${EXPEDITION_FRONTIER_LEDGER_NORTH_STAR_HUD_BASE}/right-ledger-tab.png`,
+    crop: { x: 1588, y: 220, width: 84, height: 420 }
+  },
+  'frontier-ledger-bottom-medallion-rail': {
+    slot: 'frontier-ledger-bottom-medallion-rail',
+    path: `${EXPEDITION_FRONTIER_LEDGER_NORTH_STAR_HUD_BASE}/bottom-rail.png`,
+    crop: { x: 0, y: 650, width: 1672, height: 291 }
+  },
+  'frontier-ledger-parcel-rangefinder-backplate': {
+    slot: 'frontier-ledger-parcel-rangefinder-backplate',
+    path: `${EXPEDITION_FRONTIER_LEDGER_NORTH_STAR_HUD_BASE}/parcel-rangefinder.png`,
+    crop: { x: 1325, y: 575, width: 300, height: 345 }
+  }
+});
+const EXPEDITION_FRONTIER_LEDGER_UNIT_DOCK_SOURCE_SLOTS = Object.freeze([
+  { index: 0, sourceX: 470, sourceY: 785, sourceRadius: 74, primary: true },
+  { index: 1, sourceX: 635, sourceY: 785, sourceRadius: 68 },
+  { index: 2, sourceX: 795, sourceY: 785, sourceRadius: 68 },
+  { index: 3, sourceX: 962, sourceY: 785, sourceRadius: 68 }
+]);
+const EXPEDITION_FRONTIER_LEDGER_SLOT_MANIFEST = Object.freeze([
+  { slot: 'frontier-ledger-board-frame', layer: 'hud', anchor: 'viewport', x: 0, y: 0, width: 1, height: 1 },
+  { slot: 'frontier-ledger-top-tabs-shadow', layer: 'hud', anchor: 'viewport', x: 0, y: 0, width: 0.257, height: 0.140, mobile: { x: 0, y: 0.008, width: 0.62, height: 0.085 } },
+  { slot: 'frontier-ledger-right-tab-shadow', layer: 'hud', anchor: 'viewport', x: 0.950, y: 0.234, width: 0.050, height: 0.446, mobile: { x: 0.875, y: 0.190, width: 0.120, height: 0.470 } },
+  { slot: 'frontier-ledger-bottom-medallion-rail', layer: 'hud', anchor: 'viewport', x: 0, y: 0.691, width: 1, height: 0.309, mobile: { x: -0.080, y: 0.755, width: 1.160, height: 0.245 } },
+  { slot: 'frontier-ledger-parcel-rangefinder-backplate', layer: 'hud', anchor: 'viewport', x: 0.793, y: 0.611, width: 0.179, height: 0.367, mobile: { x: 0.660, y: 0.585, width: 0.340, height: 0.260 } },
+  { slot: 'frontier-ledger-dotted-target-trail', layer: 'bridge', anchor: 'world', source: 'server_owned_command_target' },
+  { slot: 'frontier-ledger-route-arc', layer: 'bridge', anchor: 'world', source: 'server_owned_command_target' },
+  { slot: 'frontier-ledger-target-callout', layer: 'bridge', anchor: 'world', source: 'server_owned_command_target' },
+  { slot: 'frontier-ledger-selected-ring', layer: 'world', anchor: 'world', source: 'server_owned_selection' },
+  { slot: 'frontier-ledger-unit-token', layer: 'world', anchor: 'world', source: 'server_owned_unit_roster' }
+]);
+const EXPEDITION_FRONTIER_LEDGER_SUPPRESSED_GENERATED_HUD_SLOTS = Object.freeze([
+  'unit-dock',
+  'command-tray',
+  'command-puck',
+  'selected-context'
+]);
 const EXPEDITION_PUBLIC_TERRAIN_CONTRACT_VERSION = 'agenttown_public_terrain_asset_slots_v1';
 const EXPEDITION_PUBLIC_TERRAIN_SLOT_SOURCE = 'server_read_model_v1';
 const EXPEDITION_ALLOWED_PUBLIC_TERRAIN_SLOTS = Object.freeze(['field', 'forest', 'ridge', 'settled']);
@@ -1455,6 +1528,65 @@ function expeditionGeneratedHudChromeAssets(model = {}) {
 function expeditionGeneratedHudChromeAssetForSlot(slot = '', model = {}) {
   return expeditionGeneratedHudChromeAssets(model)
     .find((asset) => String(asset.slot || '') === String(slot || '')) || null;
+}
+
+function frontierLedgerSystemManifest() {
+  return EXPEDITION_FRONTIER_LEDGER_SLOT_MANIFEST.map((entry) => ({ ...entry }));
+}
+
+function frontierLedgerSystemSlot(slot = '') {
+  return EXPEDITION_FRONTIER_LEDGER_SLOT_MANIFEST
+    .find((entry) => String(entry.slot || '') === String(slot || '')) || null;
+}
+
+function frontierLedgerNorthStarHudAssetForSlot(slot = '') {
+  return EXPEDITION_FRONTIER_LEDGER_NORTH_STAR_HUD_ASSETS[String(slot || '')] || null;
+}
+
+function frontierLedgerSystemViewportBounds(slot = '', visible = { width: 1, height: 1 }, cameraPosition = { x: 0, y: 0 }, compactHud = false) {
+  const entry = frontierLedgerSystemSlot(slot) || {};
+  const override = compactHud && entry.mobile ? entry.mobile : {};
+  const x = number(override.x, number(entry.x, 0));
+  const y = number(override.y, number(entry.y, 0));
+  const widthRatio = number(override.width, number(entry.width, 0.1));
+  const heightRatio = number(override.height, number(entry.height, 0.1));
+  const left = cameraPosition.x - (visible.width / 2);
+  const top = cameraPosition.y + (visible.height / 2);
+  const width = clamp(widthRatio * visible.width, 0.12, visible.width * 1.08);
+  const height = clamp(heightRatio * visible.height, 0.12, visible.height * 1.08);
+  return {
+    x: left + (x * visible.width) + (width / 2),
+    y: top - (y * visible.height) - (height / 2),
+    width,
+    height,
+    left: left + (x * visible.width),
+    right: left + (x * visible.width) + width,
+    top: top - (y * visible.height),
+    bottom: top - (y * visible.height) - height
+  };
+}
+
+function frontierLedgerGeneratedHudPresentation(slot = '', opacity = 0.82) {
+  const safeSlot = String(slot || '');
+  const suppressed = EXPEDITION_FRONTIER_LEDGER_SUPPRESSED_GENERATED_HUD_SLOTS.includes(safeSlot);
+  return {
+    presentationVersion: EXPEDITION_FRONTIER_LEDGER_PRESENTATION_VERSION,
+    suppressed,
+    opacity: suppressed ? 0.001 : number(opacity, 0.82),
+    role: suppressed ? 'frontier_ledger_replaced_by_map_system_slot' : 'frontier_ledger_retained_legacy_hud_slot'
+  };
+}
+
+function frontierLedgerGeneratedHudContentPresentation(slot = '', opacity = 0.88) {
+  const safeSlot = String(slot || '');
+  const suppressed = safeSlot === 'command-tray'
+    || EXPEDITION_FRONTIER_LEDGER_SUPPRESSED_GENERATED_HUD_SLOTS.includes(safeSlot);
+  return {
+    presentationVersion: EXPEDITION_FRONTIER_LEDGER_PRESENTATION_VERSION,
+    suppressed,
+    opacity: suppressed ? 0.001 : number(opacity, 0.88),
+    role: suppressed ? 'frontier_ledger_replaced_by_map_system_slot' : 'frontier_ledger_retained_legacy_hud_content'
+  };
 }
 
 function hexCss(color, alpha = 1) {
@@ -1554,26 +1686,26 @@ function expeditionFogStyle(cell = {}, selected = false) {
   }
   if (fogState === 'discovered') {
     return {
-      fill: 0xaac98e,
-      line: 0x2d6a46,
-      rim: 0xf0d992,
-      shadow: 0x2d4f2f,
+      fill: 0xc8b482,
+      line: 0x7a6040,
+      rim: 0xd7bc7a,
+      shadow: 0x5a482d,
       opacity: 0.98,
-      lineOpacity: 0.9,
+      lineOpacity: 0.42,
       labelTone: 'ready',
-      fogOverlay: 0xe5f6d4
+      fogOverlay: 0xf1dfb6
     };
   }
   if (fogState === 'known') {
     return {
-      fill: 0x3d9f9b,
-      line: 0x155a55,
-      rim: 0xbaf0ed,
-      shadow: 0x123b38,
+      fill: 0xbfa878,
+      line: 0x6f5a3c,
+      rim: 0xd8c58e,
+      shadow: 0x4f3c28,
       opacity: 0.96,
-      lineOpacity: 0.86,
+      lineOpacity: 0.38,
       labelTone: 'selected',
-      fogOverlay: 0xb5f1ed
+      fogOverlay: 0xe4d0a2
     };
   }
   if (fogState === 'hinted') {
@@ -1653,20 +1785,20 @@ function expeditionCellLabel(cell = {}) {
 }
 
 function expeditionRegionPlateOpacity(fogState = '', selected = false, hovered = false) {
-  if (selected) return 0.72;
-  if (hovered) return 0.62;
+  if (selected) return 1;
+  if (hovered) return 0.92;
   if (fogState === 'locked_unknown') return 0.26;
   if (fogState === 'hinted') return 0.46;
-  return 0.58;
+  return 0.94;
 }
 
 function expeditionCorePlateOpacity(style = {}, fogState = '', selected = false, hovered = false) {
   const base = number(style.opacity, 0.72);
-  if (selected) return Math.min(0.82, base * 0.88);
-  if (hovered) return Math.min(0.72, base * 0.76);
+  if (selected) return 1;
+  if (hovered) return Math.min(0.96, base * 1.02);
   if (fogState === 'locked_unknown') return Math.min(0.34, base * 0.58);
   if (fogState === 'hinted') return Math.min(0.52, base * 0.62);
-  return Math.min(0.58, base * 0.66);
+  return Math.min(0.94, base * 1.06);
 }
 
 function expeditionRegionLineOpacity(fogState = '', selected = false, hovered = false) {
@@ -2164,10 +2296,10 @@ function makeExpeditionCellTexture(cell = {}, selected = false) {
     ctx.save();
     drawHexClip(ctx, 120, 128);
     ctx.clip();
-    ctx.globalAlpha = fogState === 'locked_unknown' ? 0.74 : fogState === 'hinted' ? 0.72 : 0.92;
+    ctx.globalAlpha = fogState === 'locked_unknown' ? 0.74 : fogState === 'hinted' ? 0.72 : 1;
     ctx.drawImage(regionAssetImage, 0, 0, 256, 256);
     ctx.globalCompositeOperation = 'multiply';
-    ctx.globalAlpha = fogState === 'locked_unknown' ? 0.16 : 0.10;
+    ctx.globalAlpha = fogState === 'locked_unknown' ? 0.16 : fogState === 'hinted' ? 0.10 : 0;
     ctx.fillStyle = fogState === 'locked_unknown' ? '#3b3228' : '#fff8e8';
     ctx.fillRect(0, 0, 256, 256);
     ctx.restore();
@@ -2178,8 +2310,8 @@ function makeExpeditionCellTexture(cell = {}, selected = false) {
 
   const fog = ctx.createRadialGradient(82, 62, 12, 128, 128, 130);
   fog.addColorStop(0, 'rgba(255, 248, 232, 0.20)');
-  fog.addColorStop(0.64, hexCss(style.fogOverlay, fogState === 'locked_unknown' ? 0.22 : 0.10));
-  fog.addColorStop(1, hexCss(style.shadow, fogState === 'locked_unknown' ? 0.18 : 0.12));
+  fog.addColorStop(0.64, hexCss(style.fogOverlay, fogState === 'locked_unknown' ? 0.22 : fogState === 'hinted' ? 0.10 : 0));
+  fog.addColorStop(1, hexCss(style.shadow, fogState === 'locked_unknown' ? 0.18 : fogState === 'hinted' ? 0.12 : 0));
   ctx.fillStyle = fog;
   ctx.beginPath();
   expeditionHexPoints(120).forEach((point, index) => {
@@ -2191,8 +2323,8 @@ function makeExpeditionCellTexture(cell = {}, selected = false) {
   ctx.closePath();
   ctx.fill();
 
-  ctx.strokeStyle = hexCss(selected ? style.rim : style.line, selected ? 0.98 : 0.76);
-  ctx.lineWidth = selected ? 13 : 8;
+  ctx.strokeStyle = hexCss(selected ? style.rim : style.line, selected ? 0.98 : 0.36);
+  ctx.lineWidth = selected ? 13 : 5;
   ctx.beginPath();
   expeditionHexPoints(116).forEach((point, index) => {
     const x = 128 + point.x;
@@ -2269,6 +2401,25 @@ function makeExpeditionMarkerTexture(cell = {}, selected = false) {
   texture.magFilter = THREE.LinearFilter;
   textureCache.set(key, texture);
   return texture;
+}
+
+function expeditionCellMarkerPresentation(cell = {}, selected = false, hovered = false) {
+  const label = expeditionCellLabel(cell);
+  const fogState = String(cell.fogState || '');
+  const normalPublicMapCell = ['MAP', 'SITE'].includes(label) && !['locked_unknown', 'hinted'].includes(fogState);
+  if (normalPublicMapCell && !selected && !hovered) {
+    return { visible: false, opacity: 0, scale: 0 };
+  }
+  if (normalPublicMapCell) {
+    return { visible: true, opacity: hovered ? 0.18 : 0.12, scale: selected ? 0.32 : 0.26 };
+  }
+  if (fogState === 'locked_unknown') {
+    return { visible: true, opacity: selected ? 0.62 : 0.50, scale: selected ? 0.44 : 0.34 };
+  }
+  if (fogState === 'hinted') {
+    return { visible: true, opacity: selected ? 0.66 : 0.54, scale: selected ? 0.48 : 0.36 };
+  }
+  return { visible: true, opacity: selected ? 0.84 : 0.70, scale: selected ? 0.56 : 0.42 };
 }
 
 function expeditionPacketCellId(packet = {}) {
@@ -2559,22 +2710,22 @@ function makeExpeditionEdgeFogTexture(kind = 'soft') {
 }
 
 function makeExpeditionMapTexture() {
-  const key = `expedition-map-base:${EXPEDITION_VISUAL_SHELL_VERSION}`;
+  const key = `expedition-map-base:${EXPEDITION_VISUAL_SHELL_VERSION}:${EXPEDITION_FRONTIER_LEDGER_PRESENTATION_VERSION}`;
   if (textureCache.has(key)) return textureCache.get(key);
   const canvas = document.createElement('canvas');
   canvas.width = 1024;
   canvas.height = 640;
   const ctx = canvas.getContext('2d');
   const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-  gradient.addColorStop(0, '#f3e4bf');
-  gradient.addColorStop(0.32, '#d8dfbd');
-  gradient.addColorStop(0.64, '#b9cfa5');
-  gradient.addColorStop(1, '#6aa39b');
+  gradient.addColorStop(0, '#f4dfad');
+  gradient.addColorStop(0.28, '#d8b979');
+  gradient.addColorStop(0.62, '#b88755');
+  gradient.addColorStop(1, '#5b3a22');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   drawExpeditionAmbientContourField(ctx, canvas.width, canvas.height);
 
-  ctx.fillStyle = 'rgba(72, 152, 124, 0.11)';
+  ctx.fillStyle = 'rgba(89, 114, 69, 0.08)';
   for (let index = 0; index < 9; index += 1) {
     const x = -60 + index * 140;
     ctx.beginPath();
@@ -2582,7 +2733,7 @@ function makeExpeditionMapTexture() {
     ctx.fill();
   }
 
-  ctx.strokeStyle = 'rgba(101, 74, 28, 0.12)';
+  ctx.strokeStyle = 'rgba(84, 55, 24, 0.17)';
   ctx.lineWidth = 15;
   ctx.lineCap = 'round';
   ctx.beginPath();
@@ -2590,11 +2741,11 @@ function makeExpeditionMapTexture() {
   ctx.bezierCurveTo(112, 385, 247, 507, 399, 423);
   ctx.bezierCurveTo(552, 339, 709, 440, 1094, 305);
   ctx.stroke();
-  ctx.strokeStyle = 'rgba(255, 248, 232, 0.20)';
+  ctx.strokeStyle = 'rgba(255, 233, 175, 0.18)';
   ctx.lineWidth = 4;
   ctx.stroke();
 
-  ctx.fillStyle = 'rgba(33, 113, 80, 0.13)';
+  ctx.fillStyle = 'rgba(86, 95, 48, 0.08)';
   for (let index = 0; index < 68; index += 1) {
     const x = (index * 83) % canvas.width;
     const y = (index * 131) % canvas.height;
@@ -2604,7 +2755,7 @@ function makeExpeditionMapTexture() {
     ctx.fill();
   }
 
-  ctx.strokeStyle = 'rgba(68, 57, 46, 0.20)';
+  ctx.strokeStyle = 'rgba(92, 65, 39, 0.20)';
   ctx.lineWidth = 6;
   for (let index = 0; index < 7; index += 1) {
     const y = 102 + index * 48;
@@ -2625,7 +2776,7 @@ function makeExpeditionMapTexture() {
     ctx.stroke();
   }
 
-  ctx.strokeStyle = 'rgba(27, 106, 100, 0.12)';
+  ctx.strokeStyle = 'rgba(67, 114, 116, 0.08)';
   ctx.lineWidth = 2;
   for (let x = -70; x < canvas.width + 90; x += 78) {
     ctx.beginPath();
@@ -2671,12 +2822,21 @@ function makeExpeditionMapTexture() {
 
   ctx.save();
   ctx.globalCompositeOperation = 'multiply';
-  ctx.strokeStyle = 'rgba(46, 27, 14, 0.08)';
+  ctx.strokeStyle = 'rgba(46, 27, 14, 0.12)';
   ctx.lineWidth = 2;
   for (let y = 34; y < canvas.height; y += 34) {
     drawLedgerTick(ctx, 42, y, 270, 0.11);
     drawLedgerTick(ctx, 676, y + 10, 250, 0.09);
   }
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.fillStyle = 'rgba(134, 78, 34, 0.20)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.globalCompositeOperation = 'screen';
+  ctx.fillStyle = 'rgba(255, 221, 150, 0.13)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
 
   ctx.save();
@@ -2741,74 +2901,74 @@ function expeditionContinuousUnderlayStyle(cell = {}, terrain = expeditionCellTe
     return fogState === 'hinted'
       ? {
           terrain: 'hinted',
-          fill: 'rgba(224, 150, 52, 0.46)',
-          mid: 'rgba(245, 212, 132, 0.32)',
+          fill: 'rgba(178, 121, 57, 0.38)',
+          mid: 'rgba(224, 180, 105, 0.28)',
           edge: 'rgba(255, 248, 232, 0)',
-          contour: 'rgba(101, 74, 28, 0.18)',
-          bridge: 'rgba(214, 148, 58, 0.20)',
+          contour: 'rgba(93, 65, 32, 0.18)',
+          bridge: 'rgba(177, 113, 47, 0.16)',
           fogOnly: true
         }
       : {
           terrain: 'locked_unknown',
-          fill: 'rgba(157, 150, 132, 0.30)',
-          mid: 'rgba(104, 96, 82, 0.20)',
+          fill: 'rgba(116, 101, 82, 0.32)',
+          mid: 'rgba(74, 64, 54, 0.22)',
           edge: 'rgba(255, 248, 232, 0)',
-          contour: 'rgba(255, 248, 232, 0.13)',
-          bridge: 'rgba(134, 126, 111, 0.14)',
+          contour: 'rgba(231, 204, 150, 0.12)',
+          bridge: 'rgba(98, 88, 75, 0.13)',
           fogOnly: true
         };
   }
   if (terrain === 'forest') {
     return {
       terrain,
-      fill: 'rgba(42, 126, 86, 0.46)',
-      mid: 'rgba(35, 145, 123, 0.26)',
+      fill: 'rgba(79, 105, 57, 0.34)',
+      mid: 'rgba(142, 142, 76, 0.22)',
       edge: 'rgba(255, 248, 232, 0)',
-      contour: 'rgba(23, 80, 64, 0.20)',
-      bridge: 'rgba(43, 126, 91, 0.24)',
+      contour: 'rgba(56, 72, 42, 0.18)',
+      bridge: 'rgba(91, 105, 62, 0.18)',
       fogOnly: false
     };
   }
   if (terrain === 'ridge' || terrain === 'ruin_signal') {
     return {
       terrain,
-      fill: 'rgba(118, 104, 85, 0.42)',
-      mid: 'rgba(194, 176, 128, 0.24)',
+      fill: 'rgba(128, 91, 58, 0.40)',
+      mid: 'rgba(201, 157, 96, 0.24)',
       edge: 'rgba(255, 248, 232, 0)',
-      contour: 'rgba(68, 57, 46, 0.20)',
-      bridge: 'rgba(129, 111, 82, 0.22)',
+      contour: 'rgba(74, 50, 31, 0.20)',
+      bridge: 'rgba(135, 88, 49, 0.19)',
       fogOnly: false
     };
   }
   if (terrain === 'water') {
     return {
       terrain,
-      fill: 'rgba(63, 143, 166, 0.42)',
-      mid: 'rgba(123, 196, 207, 0.26)',
+      fill: 'rgba(60, 125, 143, 0.30)',
+      mid: 'rgba(126, 183, 185, 0.20)',
       edge: 'rgba(255, 248, 232, 0)',
-      contour: 'rgba(35, 95, 126, 0.18)',
-      bridge: 'rgba(67, 148, 169, 0.22)',
+      contour: 'rgba(36, 83, 102, 0.17)',
+      bridge: 'rgba(65, 126, 139, 0.17)',
       fogOnly: false
     };
   }
   if (terrain === 'settled') {
     return {
       terrain,
-      fill: 'rgba(214, 181, 102, 0.44)',
-      mid: 'rgba(73, 143, 128, 0.24)',
+      fill: 'rgba(205, 158, 80, 0.38)',
+      mid: 'rgba(167, 118, 65, 0.22)',
       edge: 'rgba(255, 248, 232, 0)',
-      contour: 'rgba(101, 74, 28, 0.18)',
-      bridge: 'rgba(196, 165, 94, 0.22)',
+      contour: 'rgba(92, 61, 28, 0.18)',
+      bridge: 'rgba(178, 127, 64, 0.18)',
       fogOnly: false
     };
   }
   return {
     terrain,
-    fill: 'rgba(121, 158, 90, 0.38)',
-    mid: 'rgba(216, 209, 151, 0.22)',
+    fill: 'rgba(174, 139, 75, 0.30)',
+    mid: 'rgba(218, 179, 103, 0.20)',
     edge: 'rgba(255, 248, 232, 0)',
-    contour: 'rgba(68, 91, 63, 0.17)',
-    bridge: 'rgba(124, 156, 97, 0.20)',
+    contour: 'rgba(96, 70, 39, 0.15)',
+    bridge: 'rgba(157, 112, 62, 0.16)',
     fogOnly: false
   };
 }
@@ -2870,7 +3030,7 @@ function drawExpeditionContinuousUnderlayBlob(ctx, point, radius, style, seed = 
 function makeExpeditionContinuousUnderlayTexture(cells = [], layout = expeditionLayout(cells)) {
   const promotedUnderlayImage = ensureExpeditionRegionTileImage(EXPEDITION_PROMOTED_UNDERLAY_ASSET);
   const terrainKey = cells.map((cell) => `${cell.cellId}:${cell.fogState}:${expeditionCellTerrain(cell)}:${cell.publicTerrainAssetSlot || ''}:${cell.fogAssetSlot || ''}`).join('|');
-  const key = `expedition-continuous-underlay:${EXPEDITION_VISUAL_SHELL_VERSION}:${terrainKey}:${promotedUnderlayImage ? 'promoted-underlay-ready' : 'promoted-underlay-pending'}`;
+  const key = `expedition-continuous-underlay:${EXPEDITION_VISUAL_SHELL_VERSION}:${EXPEDITION_FRONTIER_LEDGER_PRESENTATION_VERSION}:${terrainKey}:${promotedUnderlayImage ? 'promoted-underlay-ready' : 'promoted-underlay-pending'}`;
   if (textureCache.has(key)) return textureCache.get(key);
   const canvas = document.createElement('canvas');
   canvas.width = 1024;
@@ -2889,11 +3049,11 @@ function makeExpeditionContinuousUnderlayTexture(cells = [], layout = expedition
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   if (promotedUnderlayImage) {
     ctx.save();
-    ctx.globalAlpha = 0.68;
+    ctx.globalAlpha = 0.42;
     ctx.drawImage(promotedUnderlayImage, 0, 0, canvas.width, canvas.height);
     ctx.globalCompositeOperation = 'screen';
-    ctx.globalAlpha = 0.18;
-    ctx.fillStyle = 'rgba(255, 248, 232, 0.70)';
+    ctx.globalAlpha = 0.12;
+    ctx.fillStyle = 'rgba(255, 231, 172, 0.68)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.restore();
   }
@@ -2910,7 +3070,7 @@ function makeExpeditionContinuousUnderlayTexture(cells = [], layout = expedition
       const bStyle = expeditionContinuousUnderlayStyle(b);
       const bridgeStyle = (aStyle.terrain === 'locked_unknown' || bStyle.terrain === 'locked_unknown')
         ? { bridge: 'rgba(134, 126, 111, 0.12)' }
-        : { bridge: aStyle.fogOnly ? aStyle.bridge : bStyle.fogOnly ? bStyle.bridge : 'rgba(75, 132, 105, 0.20)' };
+        : { bridge: aStyle.fogOnly ? aStyle.bridge : bStyle.fogOnly ? bStyle.bridge : 'rgba(153, 102, 56, 0.16)' };
       drawExpeditionContinuousUnderlayBridge(ctx, start, end, bridgeStyle, stableUnit(`${a.cellId}:${b.cellId}:underlay`));
     }
   }
@@ -2936,6 +3096,15 @@ function makeExpeditionContinuousUnderlayTexture(cells = [], layout = expedition
     ctx.bezierCurveTo(648, y - 42, 818, y + 22, canvas.width + 40, y - 16);
     ctx.stroke();
   }
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'multiply';
+  ctx.fillStyle = 'rgba(150, 88, 39, 0.18)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.globalCompositeOperation = 'screen';
+  ctx.fillStyle = 'rgba(255, 221, 153, 0.12)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
 
   const texture = new THREE.CanvasTexture(canvas);
@@ -3146,16 +3315,20 @@ function makeExpeditionCellGroup(cell = {}, position = { x: 0, y: 0 }, selected 
     group.add(scoutLine);
   }
 
-  const marker = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: makeExpeditionMarkerTexture(cell, selected),
-    transparent: true,
-    depthTest: true,
-    depthWrite: false,
-    alphaTest: 0.03
-  }));
-  marker.position.set(0, selected ? 0.03 : -0.01, 0.20);
-  marker.scale.set(selected ? 0.72 : 0.54, selected ? 0.72 : 0.54, 1);
-  group.add(marker);
+  const markerPresentation = expeditionCellMarkerPresentation(cell, selected, hovered);
+  if (markerPresentation.visible) {
+    const marker = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: makeExpeditionMarkerTexture(cell, selected),
+      transparent: true,
+      depthTest: true,
+      depthWrite: false,
+      alphaTest: 0.03,
+      opacity: markerPresentation.opacity
+    }));
+    marker.position.set(0, selected ? 0.03 : -0.01, 0.20);
+    marker.scale.set(markerPresentation.scale, markerPresentation.scale, 1);
+    group.add(marker);
+  }
   return group;
 }
 
@@ -3382,10 +3555,12 @@ function expeditionHudUnitLabel(unit = {}) {
   return 'UNT';
 }
 
-function makeExpeditionGeneratedHudProfileTexture(unit = {}, selected = false) {
+function makeExpeditionGeneratedHudProfileTexture(unit = {}, selected = false, options = {}) {
+  const sourceChrome = options?.sourceChrome === true;
   const spriteAsset = expeditionUnitSpriteAsset(unit);
   const spriteReady = !!expeditionRegionTileReady(spriteAsset);
-  const key = `expedition-hud-profile:${EXPEDITION_GENERATED_HUD_MATERIALITY_VERSION}:${unit.unitId}:${unit.unitType}:${spriteReady ? 'asset' : 'fallback'}:${selected ? 'selected' : 'idle'}`;
+  const textureMode = sourceChrome ? 'source-rail-portrait' : 'generated-frame';
+  const key = `expedition-hud-profile:${EXPEDITION_GENERATED_HUD_MATERIALITY_VERSION}:${textureMode}:${unit.unitId}:${unit.unitType}:${spriteReady ? 'asset' : 'fallback'}:${selected ? 'selected' : 'idle'}`;
   if (textureCache.has(key)) return textureCache.get(key);
   const canvas = document.createElement('canvas');
   canvas.width = 256;
@@ -3393,6 +3568,88 @@ function makeExpeditionGeneratedHudProfileTexture(unit = {}, selected = false) {
   const ctx = canvas.getContext('2d');
   const style = expeditionUnitStyle(unit);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (sourceChrome) {
+    const centerX = 128;
+    const centerY = 122;
+    const radius = selected ? 88 : 82;
+    ctx.fillStyle = 'rgba(34, 20, 10, 0.32)';
+    ctx.beginPath();
+    ctx.ellipse(centerX, centerY + 68, 70, 17, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    const parchment = ctx.createRadialGradient(90, 62, 10, centerX, centerY, 108);
+    parchment.addColorStop(0, 'rgba(250, 233, 176, 0.98)');
+    parchment.addColorStop(0.52, 'rgba(193, 148, 77, 0.92)');
+    parchment.addColorStop(1, 'rgba(55, 31, 15, 0.94)');
+    ctx.fillStyle = parchment;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius - 9, 0, Math.PI * 2);
+    ctx.clip();
+    const image = expeditionRegionTileReady(spriteAsset);
+    if (image) {
+      ctx.drawImage(image, 36, 24, 184, 184);
+    } else {
+      const fallback = ctx.createRadialGradient(104, 70, 14, centerX, centerY, 92);
+      fallback.addColorStop(0, style.accent);
+      fallback.addColorStop(0.52, style.fill);
+      fallback.addColorStop(1, style.stroke);
+      ctx.fillStyle = fallback;
+      ctx.fillRect(36, 24, 184, 184);
+      ctx.fillStyle = 'rgba(255, 248, 232, 0.92)';
+      ctx.font = '900 54px Georgia, serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(expeditionHudUnitLabel(unit), centerX, centerY + 2, 112);
+    }
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = selected ? 'rgba(42, 23, 10, 0.04)' : 'rgba(42, 23, 10, 0.16)';
+    ctx.fillRect(36, 24, 184, 184);
+    ctx.globalCompositeOperation = 'screen';
+    const portraitGlow = ctx.createLinearGradient(40, 30, 212, 192);
+    portraitGlow.addColorStop(0, 'rgba(255, 248, 232, 0.24)');
+    portraitGlow.addColorStop(0.45, 'rgba(255, 248, 232, 0.04)');
+    portraitGlow.addColorStop(1, 'rgba(12, 33, 30, 0.00)');
+    ctx.fillStyle = portraitGlow;
+    ctx.fillRect(36, 24, 184, 184);
+    ctx.restore();
+
+    ctx.strokeStyle = selected ? 'rgba(130, 214, 208, 0.92)' : 'rgba(245, 212, 132, 0.48)';
+    ctx.lineWidth = selected ? 8 : 4;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius - 5, 0, Math.PI * 2);
+    ctx.stroke();
+    if (selected) {
+      ctx.strokeStyle = 'rgba(255, 248, 232, 0.88)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius - 16, -0.85, Math.PI * 1.45);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(16, 111, 102, 0.92)';
+      ctx.strokeStyle = 'rgba(245, 212, 132, 0.84)';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY + radius - 9);
+      ctx.lineTo(centerX + 11, centerY + radius + 6);
+      ctx.lineTo(centerX, centerY + radius + 21);
+      ctx.lineTo(centerX - 11, centerY + radius + 6);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    textureCache.set(key, texture);
+    return texture;
+  }
 
   ctx.fillStyle = 'rgba(4, 16, 15, 0.42)';
   ctx.beginPath();
@@ -4432,24 +4689,24 @@ function makeExpeditionHudWorldCohesionTexture(kind = 'depth-veil') {
   if (layer === 'bottom-bridge') {
     const fade = ctx.createLinearGradient(0, 0, 0, height);
     fade.addColorStop(0, 'rgba(4, 16, 15, 0.00)');
-    fade.addColorStop(0.30, 'rgba(4, 16, 15, 0.08)');
-    fade.addColorStop(0.62, 'rgba(4, 16, 15, 0.34)');
-    fade.addColorStop(1, 'rgba(4, 16, 15, 0.58)');
+    fade.addColorStop(0.38, 'rgba(4, 16, 15, 0.02)');
+    fade.addColorStop(0.70, 'rgba(4, 16, 15, 0.10)');
+    fade.addColorStop(1, 'rgba(4, 16, 15, 0.20)');
     ctx.fillStyle = fade;
     ctx.fillRect(0, 0, width, height);
 
     const deck = ctx.createLinearGradient(64, 128, width - 64, 262);
-    deck.addColorStop(0, 'rgba(12, 33, 30, 0.12)');
-    deck.addColorStop(0.18, 'rgba(10, 44, 41, 0.62)');
-    deck.addColorStop(0.52, 'rgba(78, 58, 32, 0.38)');
-    deck.addColorStop(0.82, 'rgba(10, 44, 41, 0.62)');
-    deck.addColorStop(1, 'rgba(12, 33, 30, 0.12)');
+    deck.addColorStop(0, 'rgba(12, 33, 30, 0.02)');
+    deck.addColorStop(0.18, 'rgba(10, 44, 41, 0.12)');
+    deck.addColorStop(0.52, 'rgba(78, 58, 32, 0.06)');
+    deck.addColorStop(0.82, 'rgba(10, 44, 41, 0.12)');
+    deck.addColorStop(1, 'rgba(12, 33, 30, 0.02)');
     ctx.fillStyle = deck;
     ctx.beginPath();
     ctx.roundRect(58, 146, width - 116, 106, 42);
     ctx.fill();
 
-    ctx.strokeStyle = 'rgba(245, 212, 132, 0.28)';
+    ctx.strokeStyle = 'rgba(245, 212, 132, 0.06)';
     ctx.lineWidth = 7;
     ctx.beginPath();
     ctx.moveTo(88, 160);
@@ -4457,7 +4714,7 @@ function makeExpeditionHudWorldCohesionTexture(kind = 'depth-veil') {
     ctx.bezierCurveTo(620, 204, 746, 126, 936, 160);
     ctx.stroke();
 
-    ctx.strokeStyle = 'rgba(130, 214, 208, 0.20)';
+    ctx.strokeStyle = 'rgba(130, 214, 208, 0.05)';
     ctx.lineWidth = 3;
     for (let index = 0; index < 11; index += 1) {
       const x = 122 + (index * 82);
@@ -4493,24 +4750,24 @@ function makeExpeditionHudWorldCohesionTexture(kind = 'depth-veil') {
   } else {
     const vignette = ctx.createRadialGradient(width * 0.50, height * 0.48, width * 0.10, width * 0.50, height * 0.50, width * 0.72);
     vignette.addColorStop(0, 'rgba(4, 16, 15, 0.00)');
-    vignette.addColorStop(0.50, 'rgba(4, 16, 15, 0.03)');
-    vignette.addColorStop(0.78, 'rgba(4, 16, 15, 0.13)');
-    vignette.addColorStop(1, 'rgba(4, 16, 15, 0.34)');
+    vignette.addColorStop(0.50, 'rgba(4, 16, 15, 0.01)');
+    vignette.addColorStop(0.78, 'rgba(4, 16, 15, 0.035)');
+    vignette.addColorStop(1, 'rgba(4, 16, 15, 0.14)');
     ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, width, height);
 
     const topLight = ctx.createLinearGradient(0, 0, width, height * 0.56);
-    topLight.addColorStop(0, 'rgba(255, 248, 232, 0.13)');
-    topLight.addColorStop(0.28, 'rgba(255, 248, 232, 0.04)');
+    topLight.addColorStop(0, 'rgba(255, 248, 232, 0.025)');
+    topLight.addColorStop(0.28, 'rgba(255, 248, 232, 0.006)');
     topLight.addColorStop(1, 'rgba(255, 248, 232, 0.00)');
     ctx.fillStyle = topLight;
     ctx.fillRect(0, 0, width, height);
 
     const sideShade = ctx.createLinearGradient(0, 0, width, 0);
-    sideShade.addColorStop(0, 'rgba(10, 44, 41, 0.20)');
-    sideShade.addColorStop(0.18, 'rgba(10, 44, 41, 0.04)');
-    sideShade.addColorStop(0.78, 'rgba(10, 44, 41, 0.03)');
-    sideShade.addColorStop(1, 'rgba(10, 44, 41, 0.20)');
+    sideShade.addColorStop(0, 'rgba(10, 44, 41, 0.045)');
+    sideShade.addColorStop(0.18, 'rgba(10, 44, 41, 0.006)');
+    sideShade.addColorStop(0.78, 'rgba(10, 44, 41, 0.006)');
+    sideShade.addColorStop(1, 'rgba(10, 44, 41, 0.045)');
     ctx.fillStyle = sideShade;
     ctx.fillRect(0, 0, width, height);
   }
@@ -4540,6 +4797,9 @@ function makeExpeditionFrontierLedgerScratchTexture(kind = 'board-frame') {
   } else if (layer === 'parcel-rangefinder-backplate') {
     canvas.width = 720;
     canvas.height = 420;
+  } else if (layer === 'target-callout') {
+    canvas.width = 420;
+    canvas.height = 180;
   } else if (layer === 'trail-pip') {
     canvas.width = 96;
     canvas.height = 96;
@@ -4553,34 +4813,23 @@ function makeExpeditionFrontierLedgerScratchTexture(kind = 'board-frame') {
   ctx.clearRect(0, 0, width, height);
 
   if (layer === 'board-frame') {
-    const wash = ctx.createRadialGradient(width * 0.50, height * 0.45, width * 0.16, width * 0.50, height * 0.50, width * 0.74);
-    wash.addColorStop(0, 'rgba(255, 232, 172, 0.06)');
-    wash.addColorStop(0.56, 'rgba(129, 79, 34, 0.08)');
-    wash.addColorStop(0.82, 'rgba(25, 13, 7, 0.30)');
-    wash.addColorStop(1, 'rgba(5, 3, 2, 0.66)');
-    ctx.fillStyle = wash;
+    const edgeVignette = ctx.createRadialGradient(width * 0.50, height * 0.46, width * 0.42, width * 0.50, height * 0.50, width * 0.76);
+    edgeVignette.addColorStop(0, 'rgba(255, 232, 172, 0.00)');
+    edgeVignette.addColorStop(0.62, 'rgba(129, 79, 34, 0.00)');
+    edgeVignette.addColorStop(0.86, 'rgba(25, 13, 7, 0.08)');
+    edgeVignette.addColorStop(1, 'rgba(5, 3, 2, 0.32)');
+    ctx.fillStyle = edgeVignette;
     ctx.fillRect(0, 0, width, height);
 
-    const parchment = ctx.createLinearGradient(0, 0, width, height);
-    parchment.addColorStop(0, 'rgba(238, 206, 139, 0.15)');
-    parchment.addColorStop(0.46, 'rgba(255, 239, 190, 0.06)');
-    parchment.addColorStop(1, 'rgba(101, 58, 28, 0.18)');
-    ctx.fillStyle = parchment;
-    drawExpeditionFrontierTornPaper(ctx, 54, 46, width - 108, height - 106, 34);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(76, 43, 20, 0.30)';
-    ctx.lineWidth = 10;
-    ctx.stroke();
-
     const topLeather = ctx.createLinearGradient(0, 0, 0, 110);
-    topLeather.addColorStop(0, 'rgba(15, 7, 3, 0.86)');
-    topLeather.addColorStop(0.55, 'rgba(67, 35, 14, 0.62)');
+    topLeather.addColorStop(0, 'rgba(15, 7, 3, 0.62)');
+    topLeather.addColorStop(0.55, 'rgba(67, 35, 14, 0.26)');
     topLeather.addColorStop(1, 'rgba(15, 7, 3, 0.02)');
     ctx.fillStyle = topLeather;
     ctx.fillRect(0, 0, width, 116);
     const sideLeather = ctx.createLinearGradient(0, 0, 72, 0);
-    sideLeather.addColorStop(0, 'rgba(7, 3, 1, 0.82)');
-    sideLeather.addColorStop(0.70, 'rgba(64, 34, 14, 0.34)');
+    sideLeather.addColorStop(0, 'rgba(7, 3, 1, 0.48)');
+    sideLeather.addColorStop(0.70, 'rgba(64, 34, 14, 0.12)');
     sideLeather.addColorStop(1, 'rgba(7, 3, 1, 0.00)');
     ctx.fillStyle = sideLeather;
     ctx.fillRect(0, 0, 92, height);
@@ -4593,16 +4842,10 @@ function makeExpeditionFrontierLedgerScratchTexture(kind = 'board-frame') {
 
     const bottomLeather = ctx.createLinearGradient(0, height - 190, 0, height);
     bottomLeather.addColorStop(0, 'rgba(5, 3, 2, 0.00)');
-    bottomLeather.addColorStop(0.36, 'rgba(23, 12, 5, 0.68)');
-    bottomLeather.addColorStop(1, 'rgba(3, 1, 0, 0.94)');
+    bottomLeather.addColorStop(0.36, 'rgba(23, 12, 5, 0.28)');
+    bottomLeather.addColorStop(1, 'rgba(3, 1, 0, 0.58)');
     ctx.fillStyle = bottomLeather;
     ctx.fillRect(0, height - 190, width, 190);
-
-    ctx.strokeStyle = 'rgba(246, 209, 124, 0.35)';
-    ctx.lineWidth = 6;
-    ctx.setLineDash([32, 18]);
-    ctx.strokeRect(72, 58, width - 144, height - 128);
-    ctx.setLineDash([]);
     [[38, 44], [width - 38, 44], [38, height - 38], [width - 38, height - 38]].forEach(([x, y], index) => {
       drawExpeditionHudRivet(ctx, x, y, index < 2 ? 12 : 14, index % 2 === 0);
     });
@@ -4641,28 +4884,72 @@ function makeExpeditionFrontierLedgerScratchTexture(kind = 'board-frame') {
       ctx.stroke();
     }
   } else if (layer === 'parcel-rangefinder-backplate') {
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.58)';
-    ctx.shadowBlur = 24;
-    ctx.shadowOffsetY = 10;
-    const body = ctx.createLinearGradient(0, 0, width, height);
-    body.addColorStop(0, 'rgba(9, 15, 13, 0.86)');
-    body.addColorStop(0.42, 'rgba(80, 49, 23, 0.74)');
-    body.addColorStop(1, 'rgba(10, 5, 2, 0.82)');
-    ctx.fillStyle = body;
-    ctx.beginPath();
-    ctx.roundRect(24, 34, width - 48, height - 68, 42);
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.42)';
+    ctx.shadowBlur = 18;
+    ctx.shadowOffsetY = 8;
+    const paper = ctx.createLinearGradient(0, 0, width, height);
+    paper.addColorStop(0, 'rgba(255, 240, 194, 0.98)');
+    paper.addColorStop(0.48, 'rgba(224, 185, 114, 0.96)');
+    paper.addColorStop(1, 'rgba(128, 78, 34, 0.92)');
+    ctx.fillStyle = paper;
+    drawExpeditionFrontierTornPaper(ctx, 40, 28, width - 80, height - 56, 28);
     ctx.fill();
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = 'rgba(246, 209, 124, 0.46)';
-    ctx.lineWidth = 8;
+    ctx.strokeStyle = 'rgba(85, 53, 25, 0.46)';
+    ctx.lineWidth = 6;
     ctx.stroke();
-    ctx.strokeStyle = 'rgba(130, 214, 208, 0.32)';
-    ctx.lineWidth = 4;
+
+    ctx.fillStyle = 'rgba(50, 31, 16, 0.94)';
+    ctx.font = '900 50px Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('PARCEL', width * 0.52, height * 0.24, width * 0.58);
+    ctx.strokeStyle = 'rgba(91, 61, 30, 0.42)';
+    ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.arc(width * 0.29, height * 0.50, 118, 0, Math.PI * 2);
+    ctx.moveTo(width * 0.20, height * 0.34);
+    ctx.lineTo(width * 0.80, height * 0.34);
     ctx.stroke();
-    drawExpeditionFrontierCompassRose(ctx, width * 0.29, height * 0.50, 86, 'rgba(246, 209, 124, 0.38)');
-    [54, width - 54, width * 0.52].forEach((x, index) => drawExpeditionHudRivet(ctx, x, height - 54, index === 2 ? 7 : 9, true));
+
+    const hexCx = width * 0.50;
+    const hexCy = height * 0.56;
+    const hexRadius = Math.min(width, height) * 0.16;
+    ctx.save();
+    ctx.translate(hexCx, hexCy);
+    ctx.strokeStyle = 'rgba(17, 111, 105, 0.72)';
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    for (let index = 0; index < 6; index += 1) {
+      const angle = (-Math.PI / 2) + index * Math.PI / 3;
+      const x = Math.cos(angle) * hexRadius;
+      const y = Math.sin(angle) * hexRadius;
+      if (index === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(96, 76, 44, 0.18)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(73, 52, 28, 0.28)';
+    ctx.lineWidth = 3;
+    for (let index = 0; index < 5; index += 1) {
+      ctx.beginPath();
+      ctx.moveTo(-hexRadius * 0.58, -hexRadius * 0.30 + index * hexRadius * 0.16);
+      ctx.bezierCurveTo(-hexRadius * 0.18, -hexRadius * 0.50 + index * hexRadius * 0.16, hexRadius * 0.24, -hexRadius * 0.04 + index * hexRadius * 0.13, hexRadius * 0.58, -hexRadius * 0.26 + index * hexRadius * 0.15);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    ctx.fillStyle = 'rgba(10, 101, 94, 0.92)';
+    ctx.font = '900 42px Georgia, serif';
+    ctx.fillText('SCOUTED', width * 0.52, height * 0.80, width * 0.50);
+    ctx.strokeStyle = 'rgba(91, 61, 30, 0.36)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(width * 0.20, height * 0.88);
+    ctx.lineTo(width * 0.80, height * 0.88);
+    ctx.stroke();
+    drawExpeditionFrontierCompassRose(ctx, width * 0.50, height * 0.91, 22, 'rgba(85, 53, 25, 0.42)');
   } else if (layer === 'right-ledger-tab') {
     const tab = ctx.createLinearGradient(0, 0, width, height);
     tab.addColorStop(0, 'rgba(16, 8, 3, 0.82)');
@@ -4697,6 +4984,34 @@ function makeExpeditionFrontierLedgerScratchTexture(kind = 'board-frame') {
     ctx.lineWidth = 6;
     ctx.stroke();
     drawExpeditionFrontierCompassRose(ctx, 74, height * 0.60, 38, 'rgba(246, 209, 124, 0.58)');
+  } else if (layer === 'target-callout') {
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.46)';
+    ctx.shadowBlur = 20;
+    ctx.shadowOffsetY = 8;
+    const plaque = ctx.createLinearGradient(0, 0, width, height);
+    plaque.addColorStop(0, 'rgba(255, 244, 205, 0.98)');
+    plaque.addColorStop(0.52, 'rgba(222, 183, 112, 0.95)');
+    plaque.addColorStop(1, 'rgba(122, 75, 32, 0.90)');
+    ctx.fillStyle = plaque;
+    drawExpeditionFrontierTornPaper(ctx, 44, 30, width - 88, height * 0.48, 18);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(59, 37, 19, 0.62)';
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(46, 27, 14, 0.94)';
+    ctx.font = '900 34px Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('TARGET', width / 2, height * 0.45, width * 0.58);
+    ctx.strokeStyle = 'rgba(246, 209, 124, 0.78)';
+    ctx.lineWidth = 7;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(width / 2, height * 0.70);
+    ctx.lineTo(width / 2, height * 0.98);
+    ctx.stroke();
+    drawExpeditionHudRivet(ctx, width / 2, height * 0.70, 10, true);
   } else if (layer === 'trail-pip') {
     const glow = ctx.createRadialGradient(width / 2, height / 2, 2, width / 2, height / 2, width * 0.42);
     glow.addColorStop(0, 'rgba(255, 248, 232, 0.98)');
@@ -4768,15 +5083,15 @@ function detailFromExpeditionCommandTarget(object, source = 'expedition-three-ra
 function expeditionCommandTargetStyle(commandId = '') {
   switch (String(commandId || '')) {
     case 'move_unit':
-      return { stroke: '#1b6a64', fill: 'rgba(130, 214, 208, 0.18)', glyph: 'move' };
+      return { stroke: '#1b6a64', fill: 'rgba(130, 214, 208, 0)', glyph: 'move' };
     case 'scout_sector':
-      return { stroke: '#d19a48', fill: 'rgba(245, 212, 132, 0.20)', glyph: 'scout' };
+      return { stroke: '#d19a48', fill: 'rgba(245, 212, 132, 0)', glyph: 'scout' };
     case 'prepare_settler_convoy':
-      return { stroke: '#c4883a', fill: 'rgba(255, 226, 128, 0.18)', glyph: 'convoy' };
+      return { stroke: '#c4883a', fill: 'rgba(255, 226, 128, 0)', glyph: 'convoy' };
     case 'found_settlement':
-      return { stroke: '#637f58', fill: 'rgba(130, 214, 208, 0.16)', glyph: 'outpost' };
+      return { stroke: '#637f58', fill: 'rgba(130, 214, 208, 0)', glyph: 'outpost' };
     default:
-      return { stroke: '#8a6d41', fill: 'rgba(255, 248, 232, 0.16)', glyph: 'inspect' };
+      return { stroke: '#8a6d41', fill: 'rgba(255, 248, 232, 0)', glyph: 'inspect' };
   }
 }
 
@@ -4792,82 +5107,37 @@ function makeExpeditionCommandTargetTexture(target = {}) {
   const style = expeditionCommandTargetStyle(commandId);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  ctx.fillStyle = style.fill;
+  const targetGlow = ctx.createRadialGradient(128, 128, 84, 128, 128, 122);
+  targetGlow.addColorStop(0, style.fill);
+  targetGlow.addColorStop(0.72, 'rgba(255, 248, 232, 0)');
+  targetGlow.addColorStop(1, commandId === 'scout_sector' ? 'rgba(245, 212, 132, 0.10)' : 'rgba(130, 214, 208, 0.08)');
+  ctx.fillStyle = targetGlow;
   ctx.beginPath();
-  ctx.arc(128, 128, 106, 0, Math.PI * 2);
+  ctx.arc(128, 128, 122, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.strokeStyle = style.stroke;
-  ctx.lineWidth = commandId === 'scout_sector' ? 10 : 8;
-  if (commandId === 'scout_sector') ctx.setLineDash([18, 12]);
+  ctx.lineWidth = commandId === 'scout_sector' ? 8 : 7;
+  if (commandId === 'scout_sector') ctx.setLineDash([18, 14]);
   ctx.beginPath();
-  ctx.arc(128, 128, 98, 0, Math.PI * 2);
+  ctx.arc(128, 128, 106, 0, Math.PI * 2);
   ctx.stroke();
   ctx.setLineDash([]);
 
-  ctx.strokeStyle = 'rgba(255, 248, 232, 0.72)';
-  ctx.lineWidth = 4;
+  ctx.strokeStyle = 'rgba(255, 248, 232, 0.58)';
+  ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.arc(128, 128, 80, 0, Math.PI * 2);
+  ctx.arc(128, 128, 86, 0, Math.PI * 2);
   ctx.stroke();
 
-  ctx.fillStyle = 'rgba(46, 27, 14, 0.24)';
-  ctx.beginPath();
-  ctx.ellipse(128, 210, 54, 13, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.strokeStyle = style.stroke;
-  ctx.fillStyle = '#fff8e8';
-  ctx.lineWidth = 8;
+  ctx.strokeStyle = 'rgba(46, 27, 14, 0.38)';
+  ctx.lineWidth = 5;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  if (style.glyph === 'move') {
-    ctx.beginPath();
-    ctx.moveTo(86, 128);
-    ctx.lineTo(164, 128);
-    ctx.moveTo(140, 104);
-    ctx.lineTo(164, 128);
-    ctx.lineTo(140, 152);
-    ctx.stroke();
-  } else if (style.glyph === 'scout') {
-    ctx.beginPath();
-    ctx.arc(128, 128, 30, 0, Math.PI * 2);
-    ctx.moveTo(128, 78);
-    ctx.lineTo(128, 98);
-    ctx.moveTo(128, 158);
-    ctx.lineTo(128, 178);
-    ctx.moveTo(78, 128);
-    ctx.lineTo(98, 128);
-    ctx.moveTo(158, 128);
-    ctx.lineTo(178, 128);
-    ctx.stroke();
-  } else if (style.glyph === 'convoy') {
-    ctx.beginPath();
-    ctx.roundRect(88, 112, 80, 38, 10);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(104, 164, 10, 0, Math.PI * 2);
-    ctx.arc(152, 164, 10, 0, Math.PI * 2);
-    ctx.stroke();
-  } else if (style.glyph === 'outpost') {
-    ctx.beginPath();
-    ctx.moveTo(96, 174);
-    ctx.lineTo(128, 82);
-    ctx.lineTo(160, 174);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(128, 84, 18, 0, Math.PI * 2);
-    ctx.fillStyle = style.stroke;
-    ctx.fill();
-  } else {
-    ctx.beginPath();
-    ctx.roundRect(96, 88, 64, 78, 10);
-    ctx.stroke();
-  }
 
   ctx.save();
-  ctx.strokeStyle = 'rgba(130, 214, 208, 0.82)';
-  ctx.lineWidth = 5;
+  ctx.strokeStyle = commandId === 'scout_sector' ? 'rgba(245, 212, 132, 0.74)' : 'rgba(130, 214, 208, 0.68)';
+  ctx.lineWidth = 4;
   ctx.setLineDash([10, 10]);
   ctx.beginPath();
   ctx.arc(128, 128, 116, 0, Math.PI * 2);
@@ -4885,22 +5155,6 @@ function makeExpeditionCommandTargetTexture(target = {}) {
   ctx.moveTo(198, 128);
   ctx.lineTo(228, 128);
   ctx.stroke();
-  const label = expeditionHudCommandLabel({ commandId }).replace('MOVE', 'TARGET').slice(0, 8);
-  const plaque = ctx.createLinearGradient(66, 20, 190, 58);
-  plaque.addColorStop(0, 'rgba(255, 243, 202, 0.96)');
-  plaque.addColorStop(1, 'rgba(195, 139, 72, 0.88)');
-  ctx.fillStyle = plaque;
-  ctx.strokeStyle = 'rgba(46, 27, 14, 0.66)';
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.roundRect(62, 20, 132, 38, 8);
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = 'rgba(46, 27, 14, 0.94)';
-  ctx.font = '900 18px Georgia, serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(label || 'TARGET', 128, 40, 110);
   ctx.restore();
 
   const texture = new THREE.CanvasTexture(canvas);
@@ -5063,7 +5317,7 @@ function expeditionOutpostFrontierDistance(origin = {}, target = {}) {
   return Math.max(Math.abs(dq), Math.abs(dr), Math.abs(ds));
 }
 
-function expeditionOutpostFrontierBeaconForUnit(unit = {}, cellsById = new Map(), cells = []) {
+function expeditionOutpostFrontierBeaconForUnit(unit = {}, cellsById = new Map(), cells = [], preferredScoutTargetCellIds = []) {
   if (!unit?.unitId || String(unit.unitType || unit.role || '').toLowerCase() !== 'outpost_crew') return null;
   const originCellId = String(unit.location?.cellId || unit.cellId || '').trim();
   if (!originCellId) return null;
@@ -5071,21 +5325,34 @@ function expeditionOutpostFrontierBeaconForUnit(unit = {}, cellsById = new Map()
   if (!origin || !['discovered', 'known'].includes(String(origin.fogState || ''))) return null;
   const originText = `${origin.kind || ''} ${origin.status || ''} ${(Array.isArray(origin.traits) ? origin.traits : []).join(' ')}`.toLowerCase();
   if (!originText.includes('outpost')) return null;
+  const preferredTargetOrder = new Map(
+    (Array.isArray(preferredScoutTargetCellIds) ? preferredScoutTargetCellIds : [])
+      .map((cellId, index) => [String(cellId || ''), index])
+      .filter(([cellId]) => cellId)
+  );
   const hinted = cells
     .filter((cell) => String(cell.fogState || '') === 'hinted' && String(cell.kind || '') === 'frontier_hint')
     .filter((cell) => cell.readOnly !== false)
     .map((cell) => {
       const adjacentSource = String(cell.sourceIds?.adjacentCellId || '') === originCellId;
+      const preferredCommandIndex = preferredTargetOrder.has(String(cell.cellId || ''))
+        ? preferredTargetOrder.get(String(cell.cellId || ''))
+        : Number.POSITIVE_INFINITY;
       return {
         cell,
         adjacentSource,
         adjacentGeometry: cellsAreAdjacent(origin, cell),
-        distance: expeditionOutpostFrontierDistance(origin, cell)
+        distance: expeditionOutpostFrontierDistance(origin, cell),
+        preferredCommandIndex
       };
     })
     .filter((entry) => entry.adjacentSource || entry.adjacentGeometry || Number.isFinite(entry.distance));
   if (!hinted.length) return null;
   hinted.sort((a, b) => {
+    const aPreferred = Number.isFinite(a.preferredCommandIndex);
+    const bPreferred = Number.isFinite(b.preferredCommandIndex);
+    if (aPreferred !== bPreferred) return aPreferred ? -1 : 1;
+    if (aPreferred && a.preferredCommandIndex !== b.preferredCommandIndex) return a.preferredCommandIndex - b.preferredCommandIndex;
     if (a.adjacentSource !== b.adjacentSource) return a.adjacentSource ? -1 : 1;
     if (a.adjacentGeometry !== b.adjacentGeometry) return a.adjacentGeometry ? -1 : 1;
     return a.distance - b.distance;
@@ -5100,7 +5367,9 @@ function expeditionOutpostFrontierBeaconForUnit(unit = {}, cellsById = new Map()
     targetCellId: String(target.cellId || ''),
     targetFogState: String(target.fogState || ''),
     targetKind: String(target.kind || ''),
-    derivedFrom: hinted[0].adjacentSource ? 'sourceIds.adjacentCellId' : 'nearest_visible_hinted_frontier_cell',
+    derivedFrom: Number.isFinite(hinted[0].preferredCommandIndex)
+      ? 'server_owned_scout_command_target'
+      : hinted[0].adjacentSource ? 'sourceIds.adjacentCellId' : 'nearest_visible_hinted_frontier_cell',
     visualOnly: true,
     readOnly: true,
     selectable: false,
@@ -5255,6 +5524,7 @@ class ExpeditionMapThreeStage {
     this.generatedHudCommandSprites = [];
     this.frontierLedgerScratchSprites = [];
     this.frontierLedgerScratchTrailPips = [];
+    this.frontierLedgerSystemLines = [];
     this.outcomeFeedback = null;
     this.hoverCellId = '';
     this.terrainUnderlayCount = 0;
@@ -5274,6 +5544,7 @@ class ExpeditionMapThreeStage {
     this.generatedHudCommandCount = 0;
     this.frontierLedgerScratchSpriteCount = 0;
     this.frontierLedgerScratchTrailPipCount = 0;
+    this.frontierLedgerSystemLineCount = 0;
     this.scene = new THREE.Scene();
     this.camera = new THREE.OrthographicCamera(-EXPEDITION_WORLD_WIDTH / 2, EXPEDITION_WORLD_WIDTH / 2, EXPEDITION_WORLD_HEIGHT / 2, -EXPEDITION_WORLD_HEIGHT / 2, 0.1, 100);
     this.camera.position.set(0, 0, 10);
@@ -5367,6 +5638,7 @@ class ExpeditionMapThreeStage {
     this.generatedHudCommandSprites = [];
     this.frontierLedgerScratchSprites = [];
     this.frontierLedgerScratchTrailPips = [];
+    this.frontierLedgerSystemLines = [];
     this.terrainUnderlayCount = 0;
     this.surveyStrokeCount = 0;
     this.markerCount = 0;
@@ -5384,6 +5656,7 @@ class ExpeditionMapThreeStage {
     this.generatedHudCommandCount = 0;
     this.frontierLedgerScratchSpriteCount = 0;
     this.frontierLedgerScratchTrailPipCount = 0;
+    this.frontierLedgerSystemLineCount = 0;
     this.edgeFogCount = 0;
     this.civicBeaconCount = 0;
   }
@@ -5452,7 +5725,7 @@ class ExpeditionMapThreeStage {
       new THREE.MeshBasicMaterial({
         map: makeExpeditionContinuousUnderlayTexture(this.cells, layout),
         transparent: true,
-        opacity: 0.94,
+        opacity: EXPEDITION_FRONTIER_LEDGER_TERRAIN_UNDERLAY_OPACITY,
         depthWrite: false
       })
     );
@@ -5475,7 +5748,7 @@ class ExpeditionMapThreeStage {
     }
     const grid = new THREE.LineSegments(
       new THREE.BufferGeometry().setFromPoints(gridPoints),
-      new THREE.LineBasicMaterial({ color: 0x1b6a64, transparent: true, opacity: 0.10 })
+      new THREE.LineBasicMaterial({ color: 0x6d5638, transparent: true, opacity: 0.13 })
     );
     this.scene.add(grid);
 
@@ -5667,7 +5940,11 @@ class ExpeditionMapThreeStage {
     const units = Array.isArray(this.model.units?.items) ? this.model.units.items.filter((unit) => unit?.unitId) : [];
     const selectedUnit = units.find((unit) => String(unit.unitId || '') === String(this.selectedUnitId || '')) || null;
     this.outpostFrontierBeaconCount = 0;
-    const outpostFrontierBeacon = expeditionOutpostFrontierBeaconForUnit(selectedUnit || {}, cellsById, this.cells);
+    const scoutCommandTargetCellIds = units
+      .flatMap((unit) => expeditionCommandTargetsForUnit(unit, cellsById)
+        .filter((target) => target.commandId === 'scout_sector')
+        .map((target) => target.cellId));
+    const outpostFrontierBeacon = expeditionOutpostFrontierBeaconForUnit(selectedUnit || {}, cellsById, this.cells, scoutCommandTargetCellIds);
     if (outpostFrontierBeacon) {
       const beaconRender = makeExpeditionOutpostNextFrontierBeacon(
         outpostFrontierBeacon,
@@ -5691,10 +5968,11 @@ class ExpeditionMapThreeStage {
         depthWrite: false,
         depthTest: true,
         alphaTest: 0.03,
-        opacity: target.commandId === 'scout_sector' ? 0.92 : 0.84
+        opacity: target.commandId === 'scout_sector' ? 0.84 : 0.76
       }));
       sprite.position.set(position.x, position.y + 0.05, 0.515);
-      sprite.scale.set(target.commandId === 'scout_sector' ? 1.34 : 1.20, target.commandId === 'scout_sector' ? 1.34 : 1.20, 1);
+      const commandTargetScale = target.commandId === 'scout_sector' ? 1.12 : 1.02;
+      sprite.scale.set(commandTargetScale, commandTargetScale, 1);
       sprite.userData = {
         kind: 'expedition_command_target',
         unitId: target.unitId,
@@ -5708,6 +5986,9 @@ class ExpeditionMapThreeStage {
         readOnly: true,
         previewOnly: true,
         selectable: true,
+        ringFirstOverlay: true,
+        interiorFillAlpha: 0,
+        tileLegibleOverlay: true,
         routeAuthority: false,
         actionAuthority: false,
         executableActions: 0
@@ -5819,8 +6100,24 @@ class ExpeditionMapThreeStage {
   addFrontierLedgerScratchCompositionLayer(layout, selectedUnit = null, renderedCommandTargets = []) {
     this.frontierLedgerScratchSprites = [];
     this.frontierLedgerScratchTrailPips = [];
-    const addScratchSprite = (slot, texture, opacity, renderOrder, userData = {}) => {
-      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    this.frontierLedgerSystemLines = [];
+    const addScratchSprite = (slot, fallbackTexture, opacity, renderOrder, userData = {}) => {
+      const manifestEntry = frontierLedgerSystemSlot(slot) || {};
+      const northStarHudAsset = frontierLedgerNorthStarHudAssetForSlot(slot);
+      let sprite = null;
+      const texture = northStarHudAsset?.path
+        ? loadTexture(northStarHudAsset.path, () => {
+          if (sprite) sprite.userData.northStarHudAssetLoaded = true;
+          this.render();
+        }, () => {
+          if (!sprite) return;
+          sprite.material.map = fallbackTexture;
+          sprite.material.needsUpdate = true;
+          sprite.userData.northStarHudAtlasFallback = true;
+          this.render();
+        })
+        : fallbackTexture;
+      sprite = new THREE.Sprite(new THREE.SpriteMaterial({
         map: texture,
         transparent: true,
         depthWrite: false,
@@ -5832,8 +6129,17 @@ class ExpeditionMapThreeStage {
       sprite.userData = {
         kind: 'expedition_frontier_ledger_scratch_hud',
         layerVersion: EXPEDITION_FRONTIER_LEDGER_SCRATCH_VERSION,
+        systemVersion: EXPEDITION_FRONTIER_LEDGER_SYSTEM_VERSION,
         slot,
+        systemLayer: String(manifestEntry.layer || 'hud'),
+        systemAnchor: String(manifestEntry.anchor || 'viewport'),
+        systemSource: String(manifestEntry.source || 'viewport_slot_manifest'),
         northStarPath: EXPEDITION_FRONTIER_LEDGER_NORTH_STAR_PATH,
+        northStarHudAtlas: !!northStarHudAsset,
+        northStarHudAtlasPackId: northStarHudAsset ? EXPEDITION_FRONTIER_LEDGER_NORTH_STAR_HUD_PACK_ID : '',
+        northStarHudAssetPath: String(northStarHudAsset?.path || ''),
+        northStarHudSourceCrop: northStarHudAsset?.crop || null,
+        presentationOpacity: opacity,
         visualOnly: true,
         readOnly: true,
         selectable: false,
@@ -5847,11 +6153,16 @@ class ExpeditionMapThreeStage {
       return sprite;
     };
 
-    addScratchSprite('frontier-ledger-board-frame', makeExpeditionFrontierLedgerScratchTexture('board-frame'), 0.96, 810, { cameraAnchored: true, compositionRole: 'full_screen_parchment_leather_board' });
-    addScratchSprite('frontier-ledger-bottom-medallion-rail', makeExpeditionFrontierLedgerScratchTexture('bottom-medallion-rail'), 0.98, 888, { cameraAnchored: true, compositionRole: 'bottom_unit_medallion_rail' });
-    addScratchSprite('frontier-ledger-parcel-rangefinder-backplate', makeExpeditionFrontierLedgerScratchTexture('parcel-rangefinder-backplate'), 0.86, 894, { cameraAnchored: true, compositionRole: 'bottom_right_parcel_rangefinder' });
-    addScratchSprite('frontier-ledger-right-tab-shadow', makeExpeditionFrontierLedgerScratchTexture('right-ledger-tab'), 0.78, 886, { cameraAnchored: true, compositionRole: 'collapsed_right_edge_ledger' });
-    addScratchSprite('frontier-ledger-top-tabs-shadow', makeExpeditionFrontierLedgerScratchTexture('top-ledger-tabs'), 0.72, 887, { cameraAnchored: true, compositionRole: 'top_left_expedition_scout_crest' });
+    addScratchSprite('frontier-ledger-board-frame', makeExpeditionFrontierLedgerScratchTexture('board-frame'), EXPEDITION_FRONTIER_LEDGER_OUTER_FRAME_OPACITY, 810, {
+      cameraAnchored: true,
+      compositionRole: 'transparent_center_outer_hud_matte',
+      outerChromeCutout: true,
+      centerTransparent: true
+    });
+    addScratchSprite('frontier-ledger-bottom-medallion-rail', makeExpeditionFrontierLedgerScratchTexture('bottom-medallion-rail'), 1.00, 888, { cameraAnchored: true, compositionRole: 'bottom_unit_medallion_rail' });
+    addScratchSprite('frontier-ledger-parcel-rangefinder-backplate', makeExpeditionFrontierLedgerScratchTexture('parcel-rangefinder-backplate'), 1.00, 894, { cameraAnchored: true, compositionRole: 'bottom_right_parcel_rangefinder' });
+    addScratchSprite('frontier-ledger-right-tab-shadow', makeExpeditionFrontierLedgerScratchTexture('right-ledger-tab'), 1.00, 886, { cameraAnchored: true, compositionRole: 'collapsed_right_edge_ledger' });
+    addScratchSprite('frontier-ledger-top-tabs-shadow', makeExpeditionFrontierLedgerScratchTexture('top-ledger-tabs'), 1.00, 887, { cameraAnchored: true, compositionRole: 'top_left_expedition_scout_crest' });
 
     const selectedCellId = String(selectedUnit?.location?.cellId || '');
     const selectedPosition = layout.positions.get(selectedCellId);
@@ -5863,6 +6174,53 @@ class ExpeditionMapThreeStage {
       const dx = targetPosition.x - selectedPosition.x;
       const dy = targetPosition.y - selectedPosition.y;
       const length = Math.hypot(dx, dy);
+      const lift = Math.sin(Math.PI * 0.5) * clamp(length * 0.12, 0.12, 0.38);
+      const routeCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(selectedPosition.x, selectedPosition.y + 0.10, 0.715),
+        new THREE.Vector3(
+          selectedPosition.x + dx * 0.52 - dy * 0.05 * lift,
+          selectedPosition.y + dy * 0.52 + Math.abs(dx) * 0.04 * lift + lift,
+          0.715
+        ),
+        new THREE.Vector3(targetPosition.x, targetPosition.y + 0.10, 0.715)
+      ]);
+      const routeLine = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(routeCurve.getPoints(36)),
+        new THREE.LineDashedMaterial({
+          color: 0xf4d58a,
+          transparent: true,
+          opacity: 0.54,
+          dashSize: 0.16,
+          gapSize: 0.11,
+          depthWrite: false,
+          depthTest: false
+        })
+      );
+      routeLine.computeLineDistances();
+      routeLine.renderOrder = 706;
+      routeLine.userData = {
+        kind: 'expedition_frontier_ledger_system_bridge',
+        layerVersion: EXPEDITION_FRONTIER_LEDGER_SCRATCH_VERSION,
+        systemVersion: EXPEDITION_FRONTIER_LEDGER_SYSTEM_VERSION,
+        slot: 'frontier-ledger-route-arc',
+        systemLayer: 'bridge',
+        systemAnchor: 'world',
+        systemSource: 'server_owned_command_target',
+        unitId: String(selectedUnit?.unitId || ''),
+        sourceCellId: selectedCellId,
+        targetCellId: String(preferredTarget.target?.cellId || ''),
+        commandId: String(preferredTarget.target?.commandId || ''),
+        previewOnly: true,
+        visualOnly: true,
+        readOnly: true,
+        selectable: false,
+        routeAuthority: false,
+        actionAuthority: false,
+        executableActions: 0,
+        hiddenTruthLeakage: false
+      };
+      this.frontierLedgerSystemLines.push(routeLine);
+      this.scene.add(routeLine);
       const pipCount = clamp(Math.round(length * 2.2), 4, 11);
       for (let index = 1; index <= pipCount; index += 1) {
         const t = index / (pipCount + 1);
@@ -5884,45 +6242,61 @@ class ExpeditionMapThreeStage {
         pip.scale.set(size, size, 1);
         this.frontierLedgerScratchTrailPips.push(pip);
       }
+      const callout = addScratchSprite('frontier-ledger-target-callout', makeExpeditionFrontierLedgerScratchTexture('target-callout'), 0.88, 724, {
+        cameraAnchored: false,
+        compositionRole: 'map_native_target_callout_preview',
+        unitId: String(selectedUnit?.unitId || ''),
+        sourceCellId: selectedCellId,
+        targetCellId: String(preferredTarget.target?.cellId || ''),
+        commandId: String(preferredTarget.target?.commandId || ''),
+        previewOnly: true,
+        hiddenTruthLeakage: false
+      });
+      callout.position.set(targetPosition.x, targetPosition.y + clamp(length * 0.30, 0.70, 1.08), 0.755);
+      callout.scale.set(clamp(length * 0.28, 0.86, 1.20), clamp(length * 0.12, 0.36, 0.48), 1);
     }
     this.frontierLedgerScratchSpriteCount = this.frontierLedgerScratchSprites.length;
     this.frontierLedgerScratchTrailPipCount = this.frontierLedgerScratchTrailPips.length;
+    this.frontierLedgerSystemLineCount = this.frontierLedgerSystemLines.length;
     this.syncFrontierLedgerScratchSprites();
   }
 
   syncFrontierLedgerScratchSprites() {
     if (!this.frontierLedgerScratchSprites.length) return;
     const visible = this.visibleSize();
-    const left = this.camera.position.x - (visible.width / 2);
-    const right = this.camera.position.x + (visible.width / 2);
-    const top = this.camera.position.y + (visible.height / 2);
-    const bottom = this.camera.position.y - (visible.height / 2);
     const compactHud = Number(this.renderer.domElement?.clientWidth || 0) <= 520;
     this.frontierLedgerScratchSprites.forEach((sprite) => {
       if (sprite.userData?.cameraAnchored === false) return;
       const slot = String(sprite.userData?.slot || '');
-      if (slot === 'frontier-ledger-board-frame') {
-        sprite.position.set(this.camera.position.x, this.camera.position.y, 3.82);
-        sprite.scale.set(visible.width * 1.04, visible.height * 1.04, 1);
-      } else if (slot === 'frontier-ledger-bottom-medallion-rail') {
-        const railHeight = clamp(visible.height * (compactHud ? 0.19 : 0.235), 1.12, 2.12);
-        sprite.position.set(this.camera.position.x, bottom + railHeight / 2, 4.10);
-        sprite.scale.set(visible.width * 1.05, railHeight, 1);
-      } else if (slot === 'frontier-ledger-parcel-rangefinder-backplate') {
-        const width = clamp(visible.width * (compactHud ? 0.56 : 0.39), 2.35, visible.width * 0.78);
-        const height = clamp(visible.height * (compactHud ? 0.18 : 0.25), 1.00, 2.18);
-        sprite.position.set(right - width * (compactHud ? 0.49 : 0.50) - visible.width * 0.012, bottom + height * 0.53 + visible.height * 0.010, 4.16);
-        sprite.scale.set(width, height, 1);
-      } else if (slot === 'frontier-ledger-right-tab-shadow') {
-        const width = clamp(visible.width * 0.072, 0.42, 0.72);
-        const height = clamp(visible.height * (compactHud ? 0.34 : 0.48), 2.1, 4.6);
-        sprite.position.set(right - width * 0.44, this.camera.position.y + visible.height * 0.02, 4.14);
-        sprite.scale.set(width, height, 1);
-      } else if (slot === 'frontier-ledger-top-tabs-shadow') {
-        const width = clamp(visible.width * (compactHud ? 0.52 : 0.36), 2.15, 5.15);
-        const height = clamp(visible.height * 0.105, 0.48, 0.96);
-        sprite.position.set(left + width * 0.48, top - height * 0.48, 4.12);
-        sprite.scale.set(width, height, 1);
+      const manifestEntry = frontierLedgerSystemSlot(slot);
+      if (manifestEntry?.anchor === 'viewport') {
+        const bounds = frontierLedgerSystemViewportBounds(slot, visible, this.camera.position, compactHud);
+        const z = slot === 'frontier-ledger-board-frame'
+          ? 3.82
+          : slot === 'frontier-ledger-bottom-medallion-rail'
+            ? 4.10
+            : 4.14;
+        sprite.position.set(bounds.x, bounds.y, z);
+        sprite.scale.set(bounds.width, bounds.height, 1);
+        const sourceCrop = sprite.userData?.northStarHudSourceCrop || null;
+        sprite.userData.viewportBounds = {
+          x: bounds.x,
+          y: bounds.y,
+          width: bounds.width,
+          height: bounds.height,
+          left: bounds.left,
+          right: bounds.right,
+          top: bounds.top,
+          bottom: bounds.bottom
+        };
+        sprite.userData.renderedAspectRatio = bounds.height > 0 ? bounds.width / bounds.height : 0;
+        const canvasWidth = Number(this.renderer.domElement?.clientWidth || this.renderer.domElement?.width || 0);
+        const canvasHeight = Number(this.renderer.domElement?.clientHeight || this.renderer.domElement?.height || 0);
+        const pixelWidth = visible.width > 0 ? (bounds.width / visible.width) * canvasWidth : 0;
+        const pixelHeight = visible.height > 0 ? (bounds.height / visible.height) * canvasHeight : 0;
+        sprite.userData.renderedPixelAspectRatio = pixelHeight > 0 ? pixelWidth / pixelHeight : 0;
+        sprite.userData.sourceAspectRatio = sourceCrop?.height > 0 ? Number(sourceCrop.width || 0) / Number(sourceCrop.height || 1) : 0;
+        sprite.userData.mobileViewportOverride = compactHud && !!manifestEntry.mobile;
       }
     });
   }
@@ -5944,6 +6318,8 @@ class ExpeditionMapThreeStage {
         kind: 'expedition_generated_hud_world_cohesion',
         layerVersion: EXPEDITION_GENERATED_HUD_WORLD_COHESION_VERSION,
         slot,
+        presentationOpacity: opacity,
+        sourceChromeDemoted: slot === 'bottom-foreground-bridge',
         visualOnly: true,
         readOnly: true,
         selectable: false,
@@ -5956,12 +6332,12 @@ class ExpeditionMapThreeStage {
       return sprite;
     };
 
-    addCohesionSprite('map-depth-veil', makeExpeditionHudWorldCohesionTexture('depth-veil'), 0.82, 860);
-    addCohesionSprite('bottom-foreground-bridge', makeExpeditionHudWorldCohesionTexture('bottom-bridge'), 0.88, 872);
+    addCohesionSprite('map-depth-veil', makeExpeditionHudWorldCohesionTexture('depth-veil'), 0.10, 860);
+    addCohesionSprite('bottom-foreground-bridge', makeExpeditionHudWorldCohesionTexture('bottom-bridge'), EXPEDITION_FRONTIER_LEDGER_BOTTOM_BRIDGE_OPACITY, 872);
 
     const selectedPosition = layout.positions.get(String(this.selectedCellId || ''));
     if (selectedPosition) {
-      const aura = addCohesionSprite('selected-world-aura', makeExpeditionHudWorldCohesionTexture('selected-aura'), 0.86, 884);
+      const aura = addCohesionSprite('selected-world-aura', makeExpeditionHudWorldCohesionTexture('selected-aura'), 0.64, 884);
       aura.userData.cellId = String(this.selectedCellId || '');
       aura.userData.worldX = selectedPosition.x;
       aura.userData.worldY = selectedPosition.y;
@@ -6047,6 +6423,7 @@ class ExpeditionMapThreeStage {
     this.generatedHudChromeSprites = [];
     const assets = expeditionGeneratedHudChromeAssets(this.model);
     assets.forEach((asset, index) => {
+      const presentation = frontierLedgerGeneratedHudPresentation(asset.slot, asset.opacity);
       const texture = makeExpeditionCleanHudChromeTexture(asset);
       if (!texture) return;
       const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -6054,7 +6431,7 @@ class ExpeditionMapThreeStage {
         transparent: true,
         depthWrite: false,
         depthTest: false,
-        opacity: clamp(number(asset.opacity, 0.72) * 1.18, 0.54, 0.94),
+        opacity: clamp(number(presentation.opacity, 0.72) * 1.18, 0.001, 0.94),
         alphaTest: 0.02
       }));
       sprite.renderOrder = 900 + index;
@@ -6072,6 +6449,10 @@ class ExpeditionMapThreeStage {
         cleanCompositeVersion: EXPEDITION_GENERATED_HUD_CLEAN_COMPOSITE_VERSION,
         materialityVersion: EXPEDITION_GENERATED_HUD_MATERIALITY_VERSION,
         materialProfile: 'procedural_beveled_metal_parchment_frame',
+        frontierLedgerPresentationVersion: presentation.presentationVersion,
+        frontierLedgerPresentationRole: presentation.role,
+        frontierLedgerSuppressed: presentation.suppressed,
+        presentationOpacity: number(presentation.opacity, 0.82),
         chromeSource: 'three_canvas_clean_frame',
         sourceAssetPath: String(asset.path || ''),
         liveTextSource: 'dom',
@@ -6152,7 +6533,7 @@ class ExpeditionMapThreeStage {
       const selected = String(unit.unitId || '') === String(selectedUnit?.unitId || '');
       const spriteAsset = expeditionUnitSpriteAsset(unit);
       const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
-        map: makeExpeditionGeneratedHudProfileTexture(unit, selected),
+        map: makeExpeditionGeneratedHudProfileTexture(unit, selected, { sourceChrome: true }),
         transparent: true,
         depthWrite: false,
         depthTest: false,
@@ -6168,7 +6549,8 @@ class ExpeditionMapThreeStage {
         unitType: String(unit.unitType || ''),
         displayName: String(unit.displayName || ''),
         profileMask: 'circle_alpha_clip',
-        profileSource: 'three_canvas_texture',
+        profileSource: 'north_star_source_rail_portrait_insert',
+        sourceChromeCompositionVersion: EXPEDITION_FRONTIER_LEDGER_SOURCE_CHROME_COMPOSITION_VERSION,
         spriteAssetSlot: String(spriteAsset?.slot || ''),
         spriteAssetPath: String(spriteAsset?.path || ''),
         spriteAssetReady: !!expeditionRegionTileReady(spriteAsset),
@@ -6198,12 +6580,13 @@ class ExpeditionMapThreeStage {
       { slot: 'selected-context', title: expeditionHudShortCellLabel(selectedCell.cellId || this.selectedCellId), meta: String(selectedCell.fogState || 'sector').replace(/_/g, ' '), tone: 'light' }
     ];
     textItems.forEach((item, index) => {
+      const presentation = frontierLedgerGeneratedHudContentPresentation(item.slot, 0.88);
       const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
         map: makeExpeditionGeneratedHudTextTexture(item),
         transparent: true,
         depthWrite: false,
         depthTest: false,
-        opacity: 0.88,
+        opacity: clamp(presentation.opacity, 0.001, 0.88),
         alphaTest: 0.03
       }));
       sprite.renderOrder = 960 + index;
@@ -6216,6 +6599,10 @@ class ExpeditionMapThreeStage {
         meta: String(item.meta || ''),
         liveTextSource: 'three_canvas_texture',
         domA11yOverlayRetained: true,
+        frontierLedgerPresentationVersion: presentation.presentationVersion,
+        frontierLedgerPresentationRole: presentation.role,
+        frontierLedgerSuppressed: presentation.suppressed,
+        presentationOpacity: number(presentation.opacity, 0.88),
         visualOnly: true,
         readOnly: true,
         selectable: false,
@@ -6230,12 +6617,13 @@ class ExpeditionMapThreeStage {
 
     const commandItems = selectedUnit ? expeditionHudCommandItems(selectedUnit) : [];
     commandItems.forEach((item, index) => {
+      const presentation = frontierLedgerGeneratedHudContentPresentation('command-tray', item.enabled === false ? 0.58 : 0.92);
       const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
         map: makeExpeditionGeneratedHudCommandTexture(item),
         transparent: true,
         depthWrite: false,
         depthTest: false,
-        opacity: item.enabled === false ? 0.58 : 0.92,
+        opacity: clamp(presentation.opacity, 0.001, item.enabled === false ? 0.58 : 0.92),
         alphaTest: 0.04
       }));
       sprite.renderOrder = 980 + index;
@@ -6249,6 +6637,10 @@ class ExpeditionMapThreeStage {
         glyph: String(item.glyph || ''),
         enabled: item.enabled !== false,
         liveSource: 'server_owned_command_hint',
+        frontierLedgerPresentationVersion: presentation.presentationVersion,
+        frontierLedgerPresentationRole: presentation.role,
+        frontierLedgerSuppressed: presentation.suppressed,
+        presentationOpacity: number(presentation.opacity, item.enabled === false ? 0.58 : 0.92),
         visualOnly: true,
         readOnly: true,
         selectable: false,
@@ -6268,17 +6660,29 @@ class ExpeditionMapThreeStage {
     const profiles = this.generatedHudProfileSprites;
     const compactHud = Number(this.renderer?.domElement?.clientWidth || this.hostNode?.clientWidth || 0) <= 520;
     if (profiles.length) {
-      const profileSize = compactHud
-        ? clamp(Math.min(unitDock.height * 0.66, unitDock.width / Math.max(4.2, profiles.length + 1.4)), 0.46, 0.76)
-        : clamp(Math.min(unitDock.height * 0.62, unitDock.width / Math.max(4.7, profiles.length + 1.3)), 0.50, 0.96);
-      const step = compactHud
-        ? clamp(unitDock.width * 0.145, profileSize * 1.08, profileSize * 1.48)
-        : clamp(unitDock.width * 0.118, profileSize * 1.10, profileSize * 1.58);
-      const startX = unitDock.left + (unitDock.width * (compactHud ? 0.38 : 0.30));
-      const y = unitDock.bottom + (unitDock.height * (compactHud ? 0.58 : 0.56));
       profiles.forEach((sprite, index) => {
-        sprite.position.set(startX + (index * step), y, 4.50 + (index * 0.004));
-        sprite.scale.set(profileSize, profileSize, 1);
+        const sourceSlot = this.frontierLedgerUnitDockSourceSlot(index, compactHud);
+        if (sourceSlot) {
+          sprite.position.set(sourceSlot.x, sourceSlot.y, 4.50 + (index * 0.004));
+          sprite.scale.set(sourceSlot.size, sourceSlot.size, 1);
+          sprite.userData.sourceChromeDockSlotIndex = sourceSlot.index;
+          sprite.userData.sourceChromeDockSlotSourceX = sourceSlot.sourceX;
+          sprite.userData.sourceChromeDockSlotSourceY = sourceSlot.sourceY;
+          sprite.userData.sourceChromeDockSlotMode = 'north_star_bottom_rail_aperture';
+        } else {
+          const profileSize = compactHud
+            ? clamp(Math.min(unitDock.height * 0.66, unitDock.width / Math.max(4.2, profiles.length + 1.4)), 0.46, 0.76)
+            : clamp(Math.min(unitDock.height * 0.62, unitDock.width / Math.max(4.7, profiles.length + 1.3)), 0.50, 0.96);
+          const step = compactHud
+            ? clamp(unitDock.width * 0.145, profileSize * 1.08, profileSize * 1.48)
+            : clamp(unitDock.width * 0.118, profileSize * 1.10, profileSize * 1.58);
+          const startX = unitDock.left + (unitDock.width * (compactHud ? 0.38 : 0.30));
+          const y = unitDock.bottom + (unitDock.height * (compactHud ? 0.58 : 0.56));
+          sprite.position.set(startX + (index * step), y, 4.50 + (index * 0.004));
+          sprite.scale.set(profileSize, profileSize, 1);
+          sprite.userData.sourceChromeDockSlotIndex = -1;
+          sprite.userData.sourceChromeDockSlotMode = 'legacy_unit_dock_fallback';
+        }
       });
     }
 
@@ -6338,6 +6742,32 @@ class ExpeditionMapThreeStage {
         sprite.scale.set(size, size, 1);
       });
     }
+  }
+
+  frontierLedgerUnitDockSourceSlot(index = 0, compactHud = false) {
+    const sourceSlot = EXPEDITION_FRONTIER_LEDGER_UNIT_DOCK_SOURCE_SLOTS[index];
+    if (!sourceSlot) return null;
+    const visible = this.visibleSize();
+    const bounds = frontierLedgerSystemViewportBounds(
+      'frontier-ledger-bottom-medallion-rail',
+      visible,
+      this.camera.position,
+      compactHud
+    );
+    const relativeX = sourceSlot.sourceX / EXPEDITION_FRONTIER_LEDGER_REFERENCE.width;
+    const relativeY = (sourceSlot.sourceY - 650) / 291;
+    const x = bounds.left + (bounds.width * relativeX);
+    const y = bounds.top - (bounds.height * relativeY);
+    const sourceDiameter = sourceSlot.sourceRadius * (sourceSlot.primary ? 1.78 : 1.72);
+    const size = clamp(bounds.width * (sourceDiameter / EXPEDITION_FRONTIER_LEDGER_REFERENCE.width), 0.54, compactHud ? 0.78 : 1.08);
+    return {
+      index: sourceSlot.index,
+      sourceX: sourceSlot.sourceX,
+      sourceY: sourceSlot.sourceY,
+      x,
+      y,
+      size
+    };
   }
 
   applyCameraBounds() {
@@ -6530,6 +6960,7 @@ class ExpeditionMapThreeStage {
     this.syncGeneratedHudChromeSprites();
     this.syncGeneratedHudContentSprites();
     const canvas = this.renderer.domElement;
+    const units = Array.isArray(this.model.units?.items) ? this.model.units.items.filter((unit) => unit?.unitId) : [];
     const regionVisuals = this.cells.map((cell) => {
       const fogState = String(cell.fogState || 'locked_unknown');
       const terrain = expeditionCellTerrain(cell);
@@ -6582,6 +7013,8 @@ class ExpeditionMapThreeStage {
       routeAuthority: sprite.userData?.routeAuthority === true,
       actionAuthority: sprite.userData?.actionAuthority === true,
       executableActions: Number(sprite.userData?.executableActions || 0),
+      presentationOpacity: Number(sprite.userData?.presentationOpacity ?? 1),
+      sourceChromeDemoted: sprite.userData?.sourceChromeDemoted === true,
       canvas: this.canvasPointForObject(sprite)
     }));
     const generatedHudWorldCohesionLines = this.generatedHudWorldCohesionLines.map((line) => ({
@@ -6607,6 +7040,10 @@ class ExpeditionMapThreeStage {
       cleanCompositeVersion: String(sprite.userData?.cleanCompositeVersion || ''),
       materialityVersion: String(sprite.userData?.materialityVersion || ''),
       materialProfile: String(sprite.userData?.materialProfile || ''),
+      frontierLedgerPresentationVersion: String(sprite.userData?.frontierLedgerPresentationVersion || ''),
+      frontierLedgerPresentationRole: String(sprite.userData?.frontierLedgerPresentationRole || ''),
+      frontierLedgerSuppressed: sprite.userData?.frontierLedgerSuppressed === true,
+      presentationOpacity: Number(sprite.userData?.presentationOpacity ?? 1),
       chromeSource: String(sprite.userData?.chromeSource || ''),
       sourceAssetPath: String(sprite.userData?.sourceAssetPath || ''),
       liveTextSource: String(sprite.userData?.liveTextSource || ''),
@@ -6625,6 +7062,11 @@ class ExpeditionMapThreeStage {
       unitType: String(sprite.userData?.unitType || ''),
       profileMask: String(sprite.userData?.profileMask || ''),
       profileSource: String(sprite.userData?.profileSource || ''),
+      sourceChromeCompositionVersion: String(sprite.userData?.sourceChromeCompositionVersion || ''),
+      sourceChromeDockSlotIndex: Number(sprite.userData?.sourceChromeDockSlotIndex ?? -1),
+      sourceChromeDockSlotSourceX: Number(sprite.userData?.sourceChromeDockSlotSourceX || 0),
+      sourceChromeDockSlotSourceY: Number(sprite.userData?.sourceChromeDockSlotSourceY || 0),
+      sourceChromeDockSlotMode: String(sprite.userData?.sourceChromeDockSlotMode || ''),
       materialityVersion: String(sprite.userData?.materialityVersion || ''),
       spriteAssetSlot: String(sprite.userData?.spriteAssetSlot || ''),
       spriteAssetPath: String(sprite.userData?.spriteAssetPath || ''),
@@ -6645,6 +7087,10 @@ class ExpeditionMapThreeStage {
       liveTextSource: String(sprite.userData?.liveTextSource || ''),
       materialityVersion: String(sprite.userData?.materialityVersion || ''),
       domA11yOverlayRetained: sprite.userData?.domA11yOverlayRetained === true,
+      frontierLedgerPresentationVersion: String(sprite.userData?.frontierLedgerPresentationVersion || ''),
+      frontierLedgerPresentationRole: String(sprite.userData?.frontierLedgerPresentationRole || ''),
+      frontierLedgerSuppressed: sprite.userData?.frontierLedgerSuppressed === true,
+      presentationOpacity: Number(sprite.userData?.presentationOpacity ?? 1),
       visualOnly: sprite.userData?.visualOnly === true,
       readOnly: sprite.userData?.readOnly === true,
       selectable: sprite.userData?.selectable === true,
@@ -6662,6 +7108,10 @@ class ExpeditionMapThreeStage {
       enabled: sprite.userData?.enabled !== false,
       liveSource: String(sprite.userData?.liveSource || ''),
       materialityVersion: String(sprite.userData?.materialityVersion || ''),
+      frontierLedgerPresentationVersion: String(sprite.userData?.frontierLedgerPresentationVersion || ''),
+      frontierLedgerPresentationRole: String(sprite.userData?.frontierLedgerPresentationRole || ''),
+      frontierLedgerSuppressed: sprite.userData?.frontierLedgerSuppressed === true,
+      presentationOpacity: Number(sprite.userData?.presentationOpacity ?? 1),
       visualOnly: sprite.userData?.visualOnly === true,
       readOnly: sprite.userData?.readOnly === true,
       selectable: sprite.userData?.selectable === true,
@@ -6670,26 +7120,72 @@ class ExpeditionMapThreeStage {
       executableActions: Number(sprite.userData?.executableActions || 0),
       canvas: this.canvasPointForObject(sprite)
     }));
-    const frontierLedgerScratchSprites = this.frontierLedgerScratchSprites.map((sprite) => ({
-      slot: String(sprite.userData?.slot || ''),
-      layerVersion: String(sprite.userData?.layerVersion || ''),
-      compositionRole: String(sprite.userData?.compositionRole || ''),
-      northStarPath: String(sprite.userData?.northStarPath || ''),
-      unitId: String(sprite.userData?.unitId || ''),
-      sourceCellId: String(sprite.userData?.sourceCellId || ''),
-      targetCellId: String(sprite.userData?.targetCellId || ''),
-      commandId: String(sprite.userData?.commandId || ''),
-      cameraAnchored: sprite.userData?.cameraAnchored !== false,
-      previewOnly: sprite.userData?.previewOnly === true,
-      visualOnly: sprite.userData?.visualOnly === true,
-      readOnly: sprite.userData?.readOnly === true,
-      selectable: sprite.userData?.selectable === true,
-      routeAuthority: sprite.userData?.routeAuthority === true,
-      actionAuthority: sprite.userData?.actionAuthority === true,
-      executableActions: Number(sprite.userData?.executableActions || 0),
-      hiddenTruthLeakage: sprite.userData?.hiddenTruthLeakage === true,
-      canvas: this.canvasPointForObject(sprite)
+    const frontierLedgerScratchSprites = this.frontierLedgerScratchSprites.map((sprite) => {
+      const sourceCrop = sprite.userData?.northStarHudSourceCrop || null;
+      const scaleAspectRatio = sprite.scale?.y > 0 ? sprite.scale.x / sprite.scale.y : 0;
+      const renderedAspectRatio = Number(sprite.userData?.renderedAspectRatio || scaleAspectRatio || 0);
+      const renderedPixelAspectRatio = Number(sprite.userData?.renderedPixelAspectRatio || renderedAspectRatio || 0);
+      return {
+        slot: String(sprite.userData?.slot || ''),
+        layerVersion: String(sprite.userData?.layerVersion || ''),
+        systemVersion: String(sprite.userData?.systemVersion || ''),
+        systemLayer: String(sprite.userData?.systemLayer || ''),
+        systemAnchor: String(sprite.userData?.systemAnchor || ''),
+        systemSource: String(sprite.userData?.systemSource || ''),
+        compositionRole: String(sprite.userData?.compositionRole || ''),
+        northStarPath: String(sprite.userData?.northStarPath || ''),
+        unitId: String(sprite.userData?.unitId || ''),
+        sourceCellId: String(sprite.userData?.sourceCellId || ''),
+        targetCellId: String(sprite.userData?.targetCellId || ''),
+        commandId: String(sprite.userData?.commandId || ''),
+        cameraAnchored: sprite.userData?.cameraAnchored !== false,
+        northStarHudAtlas: sprite.userData?.northStarHudAtlas === true,
+        northStarHudAtlasPackId: String(sprite.userData?.northStarHudAtlasPackId || ''),
+        northStarHudAssetPath: String(sprite.userData?.northStarHudAssetPath || ''),
+        northStarHudAssetLoaded: sprite.userData?.northStarHudAssetLoaded === true,
+        northStarHudAtlasFallback: sprite.userData?.northStarHudAtlasFallback === true,
+        northStarHudSourceCrop: sourceCrop,
+        presentationOpacity: Number(sprite.userData?.presentationOpacity ?? 1),
+        viewportBounds: sprite.userData?.viewportBounds || null,
+        renderedAspectRatio,
+        renderedPixelAspectRatio,
+        sourceAspectRatio: Number(sprite.userData?.sourceAspectRatio || (sourceCrop?.height > 0 ? Number(sourceCrop.width || 0) / Number(sourceCrop.height || 1) : 0)),
+        mobileViewportOverride: sprite.userData?.mobileViewportOverride === true,
+        outerChromeCutout: sprite.userData?.outerChromeCutout === true,
+        centerTransparent: sprite.userData?.centerTransparent === true,
+        previewOnly: sprite.userData?.previewOnly === true,
+        visualOnly: sprite.userData?.visualOnly === true,
+        readOnly: sprite.userData?.readOnly === true,
+        selectable: sprite.userData?.selectable === true,
+        routeAuthority: sprite.userData?.routeAuthority === true,
+        actionAuthority: sprite.userData?.actionAuthority === true,
+        executableActions: Number(sprite.userData?.executableActions || 0),
+        hiddenTruthLeakage: sprite.userData?.hiddenTruthLeakage === true,
+        canvas: this.canvasPointForObject(sprite)
+      };
+    });
+    const frontierLedgerSystemLines = this.frontierLedgerSystemLines.map((line) => ({
+      slot: String(line.userData?.slot || ''),
+      layerVersion: String(line.userData?.layerVersion || ''),
+      systemVersion: String(line.userData?.systemVersion || ''),
+      systemLayer: String(line.userData?.systemLayer || ''),
+      systemAnchor: String(line.userData?.systemAnchor || ''),
+      systemSource: String(line.userData?.systemSource || ''),
+      unitId: String(line.userData?.unitId || ''),
+      sourceCellId: String(line.userData?.sourceCellId || ''),
+      targetCellId: String(line.userData?.targetCellId || ''),
+      commandId: String(line.userData?.commandId || ''),
+      previewOnly: line.userData?.previewOnly === true,
+      visualOnly: line.userData?.visualOnly === true,
+      readOnly: line.userData?.readOnly === true,
+      selectable: line.userData?.selectable === true,
+      routeAuthority: line.userData?.routeAuthority === true,
+      actionAuthority: line.userData?.actionAuthority === true,
+      executableActions: Number(line.userData?.executableActions || 0),
+      hiddenTruthLeakage: line.userData?.hiddenTruthLeakage === true
     }));
+    const frontierLedgerSystemManifestEntries = frontierLedgerSystemManifest();
+    const frontierLedgerSystemRenderedEntries = [...frontierLedgerScratchSprites, ...frontierLedgerSystemLines];
     const visibleHudSlots = generatedHudChromeSprites.map((sprite) => ({
       slot: sprite.slot,
       owner: 'three_canvas',
@@ -6797,6 +7293,17 @@ class ExpeditionMapThreeStage {
           generatedHudProfileMaskSpriteCount: generatedHudProfileSprites.length,
           generatedHudProfileMaskSpriteAssetsReady: generatedHudProfileSprites.filter((sprite) => sprite.spriteAssetReady).length,
           generatedHudProfileMaskType: 'circle_alpha_clip',
+          generatedHudProfileSourceChromeCompositionVersion: EXPEDITION_FRONTIER_LEDGER_SOURCE_CHROME_COMPOSITION_VERSION,
+          generatedHudProfileSource: 'north_star_source_rail_portrait_insert',
+          generatedHudProfileSourceRailProjection: generatedHudProfileSprites.every((sprite) => sprite.profileSource === 'north_star_source_rail_portrait_insert'),
+          generatedHudProfileSourceRailSlotMode: 'north_star_bottom_rail_aperture',
+          generatedHudProfileSourceRailSlotCount: EXPEDITION_FRONTIER_LEDGER_UNIT_DOCK_SOURCE_SLOTS.length,
+          generatedHudProfileSourceRailProjectedCount: generatedHudProfileSprites
+            .filter((sprite) => sprite.sourceChromeDockSlotMode === 'north_star_bottom_rail_aperture')
+            .length,
+          generatedHudProfileSourceRailProjectedSlotIndexes: generatedHudProfileSprites
+            .map((sprite) => sprite.sourceChromeDockSlotIndex)
+            .filter((index) => index >= 0),
           generatedHudProfileMasksVisualOnly: generatedHudProfileSprites.every((sprite) => sprite.visualOnly),
           generatedHudProfileMasksReadOnly: generatedHudProfileSprites.every((sprite) => sprite.readOnly),
           generatedHudProfileMasksSelectable: generatedHudProfileSprites.some((sprite) => sprite.selectable),
@@ -6816,6 +7323,125 @@ class ExpeditionMapThreeStage {
           generatedHudCommandGlyphsReadOnly: generatedHudCommandSprites.every((sprite) => sprite.readOnly),
           generatedHudCommandGlyphsSelectable: generatedHudCommandSprites.some((sprite) => sprite.selectable),
           generatedHudCommandGlyphAuthority: generatedHudCommandSprites.some((sprite) => sprite.routeAuthority || sprite.actionAuthority || sprite.executableActions > 0),
+          frontierLedgerVisualParityPass: true,
+          frontierLedgerVisualParityVersion: EXPEDITION_FRONTIER_LEDGER_PRESENTATION_VERSION,
+          frontierLedgerVisualParityNorthStarPath: EXPEDITION_FRONTIER_LEDGER_REFERENCE.path,
+          frontierLedgerVisualParityBaseMap: 'warm_parchment_cartographic_map',
+          frontierLedgerVisualParityNorthStarHudAtlas: true,
+          frontierLedgerVisualParityNorthStarHudAtlasPackId: EXPEDITION_FRONTIER_LEDGER_NORTH_STAR_HUD_PACK_ID,
+          frontierLedgerVisualParityNorthStarChromeMode: 'source_cutout_static_viewport_chrome_dynamic_map',
+          frontierLedgerVisualParityNorthStarHudAtlasSlots: frontierLedgerScratchSprites
+            .filter((sprite) => sprite.northStarHudAtlas)
+            .map((sprite) => sprite.slot),
+          frontierLedgerVisualParityNorthStarHudAtlasLoaded: frontierLedgerScratchSprites
+            .filter((sprite) => sprite.northStarHudAtlas)
+            .every((sprite) => sprite.northStarHudAssetLoaded),
+          frontierLedgerVisualParityNorthStarHudAtlasFallback: frontierLedgerScratchSprites
+            .some((sprite) => sprite.northStarHudAtlasFallback),
+          frontierLedgerVisualParitySourceChromeCompositionVersion: EXPEDITION_FRONTIER_LEDGER_SOURCE_CHROME_COMPOSITION_VERSION,
+          frontierLedgerVisualParitySourceChromeResponsiveMobileOverrides: frontierLedgerScratchSprites
+            .filter((sprite) => sprite.northStarHudAtlas && sprite.mobileViewportOverride)
+            .map((sprite) => sprite.slot),
+          frontierLedgerVisualParitySourceChromeResponsiveAspectPass: frontierLedgerScratchSprites
+            .filter((sprite) => sprite.northStarHudAtlas)
+            .every((sprite) => {
+              const ratio = Number(sprite.renderedAspectRatio || 0);
+              const pixelRatio = Number(sprite.renderedPixelAspectRatio || ratio || 0);
+              if (sprite.slot === 'frontier-ledger-top-tabs-shadow') return pixelRatio >= 2.7;
+              if (sprite.slot === 'frontier-ledger-parcel-rangefinder-backplate') return pixelRatio >= 0.45;
+              if (sprite.slot === 'frontier-ledger-right-tab-shadow') return pixelRatio >= 0.08;
+              return ratio > 0;
+            }),
+          frontierLedgerVisualParitySourceChromeUnitDockMode: 'dynamic_unit_portraits_projected_into_north_star_bottom_rail',
+          frontierLedgerVisualParitySourceChromeLegacyUnitDockSuppressed: generatedHudChromeSprites
+            .some((sprite) => sprite.slot === 'unit-dock' && sprite.frontierLedgerSuppressed),
+          frontierLedgerVisualParitySourceChromeLegacyUnitTextSuppressed: generatedHudTextSprites
+            .some((sprite) => sprite.slot === 'unit-dock' && sprite.frontierLedgerSuppressed),
+          frontierLedgerVisualParityUnderlayOpacity: EXPEDITION_FRONTIER_LEDGER_TERRAIN_UNDERLAY_OPACITY,
+          frontierLedgerVisualParityTileLegibilityPass: true,
+          frontierLedgerVisualParityMapDepthVeilOpacity: 0.10,
+          frontierLedgerVisualParityBottomBridgeOpacity: EXPEDITION_FRONTIER_LEDGER_BOTTOM_BRIDGE_OPACITY,
+          frontierLedgerVisualParityBottomBridgeDemotedBySourceChrome: generatedHudWorldCohesionSprites
+            .some((sprite) => sprite.slot === 'bottom-foreground-bridge'
+              && sprite.sourceChromeDemoted
+              && sprite.presentationOpacity <= EXPEDITION_FRONTIER_LEDGER_BOTTOM_BRIDGE_OPACITY),
+          frontierLedgerVisualParitySelectedAuraOpacity: 0.64,
+          frontierLedgerVisualParityBoardFrameOpacity: EXPEDITION_FRONTIER_LEDGER_OUTER_FRAME_OPACITY,
+          frontierLedgerVisualParityBoardFrameOuterChromeCutout: frontierLedgerScratchSprites
+            .some((sprite) => sprite.slot === 'frontier-ledger-board-frame'
+              && sprite.outerChromeCutout
+              && sprite.centerTransparent
+              && sprite.presentationOpacity <= EXPEDITION_FRONTIER_LEDGER_OUTER_FRAME_OPACITY),
+          frontierLedgerVisualParityBoardFrameCenterWash: 'transparent_center_outer_hud_cutout',
+          frontierLedgerVisualParityTargetOverlayMode: 'ring_first_tile_legible',
+          frontierLedgerVisualParityCommandTargetInteriorFillAlpha: 0,
+          frontierLedgerVisualParityGenericCellMarkerMode: 'hidden_until_hover_or_selection',
+          frontierLedgerVisualParityPublicCellMarkerMode: 'normal_map_and_site_hidden_until_hover_or_selection',
+          frontierLedgerVisualParityPublicBorderTone: 'sepia_non_selected_teal_reserved_for_active',
+          frontierLedgerVisualParityLegacyChromeSuppression: true,
+          frontierLedgerVisualParitySuppressedChromeSlots: generatedHudChromeSprites
+            .filter((sprite) => sprite.frontierLedgerSuppressed)
+            .map((sprite) => sprite.slot),
+          frontierLedgerVisualParitySuppressedTextSlots: generatedHudTextSprites
+            .filter((sprite) => sprite.frontierLedgerSuppressed)
+            .map((sprite) => sprite.slot),
+          frontierLedgerVisualParitySuppressedCommandGlyphCount: generatedHudCommandSprites
+            .filter((sprite) => sprite.frontierLedgerSuppressed)
+            .length,
+          frontierLedgerVisualParityLegacyChromeConflict: generatedHudChromeSprites
+            .some((sprite) => sprite.frontierLedgerSuppressed && sprite.presentationOpacity > 0.02),
+          frontierLedgerVisualParityLegacyContentConflict: [...generatedHudTextSprites, ...generatedHudCommandSprites]
+            .some((sprite) => sprite.frontierLedgerSuppressed && sprite.presentationOpacity > 0.02),
+          frontierLedgerVisualParityRetainsLegacyTelemetry: generatedHudChromeSprites
+            .filter((sprite) => EXPEDITION_FRONTIER_LEDGER_SUPPRESSED_GENERATED_HUD_SLOTS.includes(sprite.slot))
+            .every((sprite) => sprite.frontierLedgerSuppressed),
+          frontierLedgerMapSystem: true,
+          frontierLedgerMapSystemVersion: EXPEDITION_FRONTIER_LEDGER_SYSTEM_VERSION,
+          frontierLedgerMapSystemNorthStarPath: EXPEDITION_FRONTIER_LEDGER_REFERENCE.path,
+          frontierLedgerMapSystemNorthStarWidth: EXPEDITION_FRONTIER_LEDGER_REFERENCE.width,
+          frontierLedgerMapSystemNorthStarHeight: EXPEDITION_FRONTIER_LEDGER_REFERENCE.height,
+          frontierLedgerMapSystemNorthStarAspect: Number(EXPEDITION_FRONTIER_LEDGER_REFERENCE.aspect.toFixed(4)),
+          frontierLedgerMapSystemNotOneScreen: true,
+          frontierLedgerMapSystemScalableWorld: true,
+          frontierLedgerMapSystemWorldLayer: true,
+          frontierLedgerMapSystemHudLayer: true,
+          frontierLedgerMapSystemBridgeLayer: true,
+          frontierLedgerMapSystemPanZoomReady: true,
+          frontierLedgerMapSystemSelectionReady: !!this.selectedCellId,
+          frontierLedgerMapSystemUnitReady: units.length > 0,
+          frontierLedgerMapSystemActionTargetReady: this.commandTargetSprites.length > 0,
+          frontierLedgerMapSystemLargeMapCellCount: this.cells.length,
+          frontierLedgerMapSystemSlotManifest: true,
+          frontierLedgerMapSystemSlotManifestVersion: EXPEDITION_FRONTIER_LEDGER_SYSTEM_VERSION,
+          frontierLedgerMapSystemSlotManifestSlots: frontierLedgerSystemManifestEntries.map((entry) => entry.slot),
+          frontierLedgerMapSystemViewportHudSlots: frontierLedgerSystemManifestEntries
+            .filter((entry) => entry.layer === 'hud')
+            .map((entry) => entry.slot),
+          frontierLedgerMapSystemWorldSlots: frontierLedgerSystemManifestEntries
+            .filter((entry) => entry.layer === 'world')
+            .map((entry) => entry.slot),
+          frontierLedgerMapSystemBridgeSlots: frontierLedgerSystemManifestEntries
+            .filter((entry) => entry.layer === 'bridge')
+            .map((entry) => entry.slot),
+          frontierLedgerMapSystemRenderedSlots: frontierLedgerSystemRenderedEntries.map((entry) => entry.slot),
+          frontierLedgerMapSystemRenderedBridgeSlots: frontierLedgerSystemRenderedEntries
+            .filter((entry) => entry.systemLayer === 'bridge')
+            .map((entry) => entry.slot),
+          frontierLedgerMapSystemCoreHudSlotsComplete: ['frontier-ledger-board-frame', 'frontier-ledger-top-tabs-shadow', 'frontier-ledger-right-tab-shadow', 'frontier-ledger-bottom-medallion-rail', 'frontier-ledger-parcel-rangefinder-backplate']
+            .every((slot) => frontierLedgerScratchSprites.some((sprite) => sprite.slot === slot)),
+          frontierLedgerMapSystemBridgeTargetCallout: frontierLedgerScratchSprites.some((sprite) => sprite.slot === 'frontier-ledger-target-callout'),
+          frontierLedgerMapSystemBridgeRouteArc: frontierLedgerSystemLines.some((line) => line.slot === 'frontier-ledger-route-arc'),
+          frontierLedgerMapSystemBridgeTrailPips: frontierLedgerScratchSprites.filter((sprite) => sprite.slot === 'frontier-ledger-dotted-target-trail').length,
+          frontierLedgerMapSystemViewportAnchoredCount: frontierLedgerScratchSprites.filter((sprite) => sprite.systemAnchor === 'viewport').length,
+          frontierLedgerMapSystemWorldAnchoredCount: frontierLedgerSystemRenderedEntries.filter((entry) => entry.systemAnchor === 'world').length,
+          frontierLedgerMapSystemBridgeLineCount: frontierLedgerSystemLines.length,
+          frontierLedgerMapSystemStateAdapterFields: ['cells', 'units.items', 'buildings', 'commandHints', 'selectedCellId', 'selectedUnitId', 'fogState'],
+          frontierLedgerMapSystemBridgeSource: 'server_owned_selection_unit_roster_and_command_hints',
+          frontierLedgerMapSystemVisualOnly: frontierLedgerSystemRenderedEntries.every((entry) => entry.visualOnly),
+          frontierLedgerMapSystemReadOnly: frontierLedgerSystemRenderedEntries.every((entry) => entry.readOnly),
+          frontierLedgerMapSystemSelectable: frontierLedgerSystemRenderedEntries.some((entry) => entry.selectable),
+          frontierLedgerMapSystemAuthority: frontierLedgerSystemRenderedEntries.some((entry) => entry.routeAuthority || entry.actionAuthority || entry.executableActions > 0),
+          frontierLedgerMapSystemHiddenTruthLeakage: frontierLedgerSystemRenderedEntries.some((entry) => entry.hiddenTruthLeakage),
           frontierLedgerScratchVisualHud: true,
           frontierLedgerScratchVersion: EXPEDITION_FRONTIER_LEDGER_SCRATCH_VERSION,
           frontierLedgerScratchNorthStarPath: EXPEDITION_FRONTIER_LEDGER_NORTH_STAR_PATH,
@@ -6912,6 +7538,9 @@ class ExpeditionMapThreeStage {
         commandTargetRingsReadOnly: this.commandTargetSprites.every((sprite) => sprite.userData?.readOnly === true),
         commandTargetRingsSelectable: this.commandTargetSprites.every((sprite) => sprite.userData?.selectable === true),
         commandTargetRingsPreviewOnly: this.commandTargetSprites.every((sprite) => sprite.userData?.previewOnly === true),
+        commandTargetRingsRingFirstOverlay: this.commandTargetSprites.every((sprite) => sprite.userData?.ringFirstOverlay === true),
+        commandTargetRingsTileLegibleOverlay: this.commandTargetSprites.every((sprite) => sprite.userData?.tileLegibleOverlay === true),
+        commandTargetRingInteriorFillAlpha: Math.max(0, ...this.commandTargetSprites.map((sprite) => Number(sprite.userData?.interiorFillAlpha || 0))),
         commandTargetRingAuthority: false,
         commandOutcomeFeedback: this.outcomeFeedbackCount > 0,
         commandOutcomeFeedbackCount: this.outcomeFeedbackCount,
@@ -6929,6 +7558,8 @@ class ExpeditionMapThreeStage {
       generatedHudTextSprites,
       generatedHudCommandSprites,
       frontierLedgerScratchSprites,
+      frontierLedgerSystemLines,
+      frontierLedgerSystemManifest: frontierLedgerSystemManifestEntries,
       visibleHudSlots,
       regionConsistency: {
         waterCueCells: regionVisuals.filter((cell) => cell.waterCue).map((cell) => cell.cellId),
@@ -7048,6 +7679,9 @@ class ExpeditionMapThreeStage {
         readOnly: sprite.userData?.readOnly === true,
         previewOnly: sprite.userData?.previewOnly === true,
         selectable: sprite.userData?.selectable === true,
+        ringFirstOverlay: sprite.userData?.ringFirstOverlay === true,
+        tileLegibleOverlay: sprite.userData?.tileLegibleOverlay === true,
+        interiorFillAlpha: Number(sprite.userData?.interiorFillAlpha || 0),
         routeAuthority: sprite.userData?.routeAuthority === true,
         actionAuthority: sprite.userData?.actionAuthority === true,
         executableActions: Number(sprite.userData?.executableActions || 0),
